@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card wide">
+  <h1>{{ property_label }}</h1>
+  <p class="disclaimer">
+    <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
+    Arizona statute does not define "normal wear and tear." HUD figures below are industry
+    guidance, not binding Arizona law. A human must review every suggested charge before it
+    is communicated to a tenant.
+  </p>
+
+  {% if warnings %}
+    <div class="warnings">
+      {% for w in warnings %}<p>&#9888; {{ w }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
+  {% if results %}
+  <table>
+    <thead>
+      <tr>
+        <th>Room</th><th>Item</th><th>Move-In</th><th>Move-Out</th>
+        <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      {% if 'CHARGEABLE' in r.verdict %}{% set row_class = 'row-chargeable' %}
+      {% elif 'WEAR' in r.verdict %}{% set row_class = 'row-wear' %}
+      {% else %}{% set row_class = 'row-review' %}{% endif %}
+      <tr class="{{ row_class }}">
+        <td>{{ r.room }}</td>
+        <td>{{ r.item }}</td>
+        <td>{{ r.move_in_condition }}</td>
+        <td>{{ r.move_out_condition }}{% if r.move_out_notes %} &mdash; {{ r.move_out_notes }}{% endif %}</td>
+        <td>{{ r.verdict }}</td>
+        <td>{{ r.category }}</td>
+        <td>{{ r.az_citations | join('; ') }}</td>
+        <td>{{ r.hud_citation or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="note">{{ results | length }} item(s) flagged as changed between move-in and move-out.</p>
+  {% else %}
+  <p>No changed items were detected between the two assessments.</p>
+  {% endif %}
+
+  <a class="button-link" href="{{ url_for('index') }}">Run another comparison</a>
+</div>
+{% endblock %}

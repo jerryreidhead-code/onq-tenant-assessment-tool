@@ -1,0 +1,132 @@
+{
+  "_meta": {
+    "description": "Structured reference derived from az_hud_reference.md. AZ statute has NO defined 'normal wear and tear' standard or useful-life table -- all useful_life_years and wear/damage example phrases below are HUD industry guidance (non-binding on private AZ landlords), not Arizona law. Always surface both citation types separately in output.",
+    "az_operative_statute": "A.R.S. § 33-1341(6): tenant liable for damage that is 'deliberately or negligently' caused; ordinary deterioration is not chargeable.",
+    "deposit_rules": {
+      "max_deposit_multiplier_of_rent": 1.5,
+      "itemized_deduction_deadline_business_days": 14,
+      "tenant_dispute_window_days": 60,
+      "landlord_noncompliance_penalty_multiplier": 2,
+      "citation": "A.R.S. § 33-1321(D)/(E)"
+    },
+    "hud_source_citation": "HUD Special Claims Processing Guide (HSG-06-01), June 2006, Chapter 5, Appendix 5C & 5D",
+    "proration_formula": "max_chargeable = repair_or_replacement_cost * (remaining_useful_life_years / total_useful_life_years); 0 if item already past useful life"
+  },
+  "categories": [
+    {
+      "key": "carpet_flooring",
+      "label": "Carpet / Flooring",
+      "match_keywords": ["carpet", "flooring", "floor", "rug"],
+      "wear_and_tear_examples": ["faded", "worn thin from walking", "floors needing a coat of varnish", "loose grouting"],
+      "damage_examples": ["hole", "stain", "burn", "chipped wood floor", "gouged wood floor", "torn carpet"],
+      "useful_life_years": {"family": 5, "elderly": 7},
+      "az_citations": ["A.R.S. § 33-1341(6)", "A.R.S. § 33-1321(D)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C/5D"
+    },
+    {
+      "key": "paint_walls",
+      "label": "Paint / Walls",
+      "match_keywords": ["paint", "wall", "wallpaper", "plaster", "drywall"],
+      "wear_and_tear_examples": ["fading", "peeling", "cracked paint", "small chips in plaster", "nail hole", "pin hole", "slightly torn wallpaper", "slightly faded wallpaper"],
+      "damage_examples": ["gaping hole", "crayon", "drawing on wall", "unapproved wallpaper", "seriously damaged wallpaper", "ruined wallpaper"],
+      "useful_life_years": {"flat_family": 3, "flat_elderly": 5, "enamel_family": 5, "enamel_elderly": 7},
+      "az_citations": ["A.R.S. § 33-1341(6)", "A.R.S. § 33-1321(D)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C/5D"
+    },
+    {
+      "key": "appliances",
+      "label": "Appliances",
+      "match_keywords": ["refrigerator", "fridge", "range", "stove", "oven", "dishwasher", "microwave", "water heater", "air conditioning", "a/c", "hvac unit"],
+      "wear_and_tear_examples": ["age-related failure", "normal deterioration", "no longer under warranty"],
+      "damage_examples": ["abused", "neglected", "misuse", "broken from improper use"],
+      "useful_life_years": {"refrigerator": 10, "range": 20, "hot_water_heater": 10, "air_conditioning": 10},
+      "az_citations": ["A.R.S. § 33-1324(A)(4)", "A.R.S. § 33-1341(5)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5D",
+      "notes": "Landlord's default maintenance duty under 33-1324(A)(4) unless lease reassigns specific tasks."
+    },
+    {
+      "key": "blinds_window_coverings",
+      "label": "Blinds / Window Coverings",
+      "match_keywords": ["blind", "shade", "curtain", "window covering"],
+      "wear_and_tear_examples": ["dirty", "faded lamp or window shades"],
+      "damage_examples": ["torn", "stained", "missing shade", "missing blind"],
+      "useful_life_years": {"all": 3},
+      "az_citations": ["A.R.S. § 33-1341(6)", "A.R.S. § 33-1321(D)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C/5D"
+    },
+    {
+      "key": "cleaning",
+      "label": "General Cleaning",
+      "match_keywords": ["clean", "dirty", "odor", "smell", "trash", "debris"],
+      "wear_and_tear_examples": ["routine turnover cleaning", "light dust"],
+      "damage_examples": ["excessive filth", "biohazard", "pet waste", "heavy odor requiring remediation", "trash left behind"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1310 (cleaning charge excluded from 'security' definition, but must be reasonable and, if nonrefundable, disclosed in writing per 33-1321(B))"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C intro (routine turnover cleaning is a landlord cost of doing business)",
+      "notes": "Only cleaning beyond normal turnover standard is chargeable."
+    },
+    {
+      "key": "keys_locks",
+      "label": "Keys / Locks",
+      "match_keywords": ["key", "lock", "fob", "garage remote", "access card"],
+      "wear_and_tear_examples": [],
+      "damage_examples": ["not returned", "missing key", "lost key", "rekey required"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1368(C)"],
+      "hud_citation": "HUD Special Claims Processing Guide § 5-2.D.4.a (failure to return keys is an allowable charge)"
+    },
+    {
+      "key": "hvac_filters",
+      "label": "HVAC Filters",
+      "match_keywords": ["hvac filter", "air filter", "furnace filter"],
+      "wear_and_tear_examples": ["not changed regularly (landlord default duty unless lease reassigns)"],
+      "damage_examples": ["never changed causing system damage (only if lease assigns filter duty to tenant)"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1324(A)(4)", "A.R.S. § 33-1324(C)/(D)"],
+      "hud_citation": null,
+      "notes": "Chargeable only if lease validly reassigns this specific maintenance task to tenant."
+    },
+    {
+      "key": "doors",
+      "label": "Doors",
+      "match_keywords": ["door", "hinge", "doorknob", "door frame"],
+      "wear_and_tear_examples": ["sticking from humidity"],
+      "damage_examples": ["ripped off hinges", "broken door", "hole in door", "damaged door frame"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1341(6)"],
+      "hud_citation": null,
+      "notes": "No HUD useful-life figure located for doors -- gap, do not invent a number."
+    },
+    {
+      "key": "cabinets",
+      "label": "Cabinets",
+      "match_keywords": ["cabinet", "cupboard", "drawer"],
+      "wear_and_tear_examples": ["ordinary handle wear", "loose hinge"],
+      "damage_examples": ["broken cabinet door", "water damage from misuse", "missing cabinet front"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1341(6)", "A.R.S. § 33-1324(A)(2)"],
+      "hud_citation": null,
+      "notes": "No HUD useful-life figure located for cabinets -- gap, do not invent a number."
+    },
+    {
+      "key": "windows",
+      "label": "Windows",
+      "match_keywords": ["window", "window pane", "glass"],
+      "wear_and_tear_examples": ["cracked window pane from faulty foundation or building settling"],
+      "damage_examples": ["broken window", "shattered glass"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1341(6)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C"
+    },
+    {
+      "key": "plumbing_fixtures",
+      "label": "Plumbing Fixtures (sinks/tubs/toilets)",
+      "match_keywords": ["sink", "bathtub", "tub", "toilet", "faucet", "shower rod", "grout", "tile"],
+      "wear_and_tear_examples": ["worn or scratched enamel in old bathtubs", "rusty shower rod", "partially clogged sinks from aging pipes", "loose grouting and bathroom tiles"],
+      "damage_examples": ["missing or cracked bathroom tiles", "chipped and broken enamel", "clogged or damaged toilet from improper use", "missing or bent shower rods"],
+      "useful_life_years": {"tiles_linoleum_family": 5, "tiles_linoleum_elderly": 7},
+      "az_citations": ["A.R.S. § 33-1341(4)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": "HUD Special Claims Processing Guide Appendix 5C/5D"
+    }
+  ]
+}

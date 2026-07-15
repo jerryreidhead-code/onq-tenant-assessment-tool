@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Compare a move-in / move-out assessment</h1>
+  <p class="disclaimer">
+    Results are a decision-support draft, not legal advice or a final charge determination.
+    Arizona statute does not define "normal wear and tear" &mdash; HUD figures cited in the
+    report are industry guidance, not binding Arizona law. A human must review every
+    suggested charge before it is communicated to a tenant.
+  </p>
+  <form method="post" action="{{ url_for('compare') }}" enctype="multipart/form-data">
+    <label for="property">Property label</label>
+    <input type="text" id="property" name="property" placeholder="e.g. 123 Main St, Tempe AZ">
+
+    <label for="move_in_pdf">Move-in assessment PDF</label>
+    <input type="file" id="move_in_pdf" name="move_in_pdf" accept="application/pdf" required>
+
+    <label for="move_out_pdf">Move-out assessment PDF</label>
+    <input type="file" id="move_out_pdf" name="move_out_pdf" accept="application/pdf" required>
+
+    <button type="submit">Compare</button>
+  </form>
+  <p class="note">Uploaded PDFs are processed in memory and are not stored on the server.</p>
+</div>
+{% endblock %}
