@@ -1,94 +1,159 @@
 :root {
   color-scheme: light dark;
-  --bg: #f5f6f8;
+  --navy: #003366;
+  --primary: #16609C;
+  --primary-glow: #1D7BC9;
+  --gold: #E8BA30;
+  --gold-light: #F0C442;
+  --bg: #FAFAFA;
   --card-bg: #ffffff;
-  --text: #1a1d23;
-  --muted: #5b6270;
-  --border: #dfe3e8;
-  --accent: #2b5cab;
-  --warn-bg: #fff4e5;
-  --chargeable: #fdecec;
-  --wear: #eaf7ec;
-  --review: #fff8e1;
+  --text: #003366;
+  --muted: #627384;
+  --border: #DCE0E5;
+  --muted-bg: #E8EBEE;
+  --warn-bg: #FEF6E4;
+  --chargeable: #FDECEC;
+  --wear: #E9F8F0;
+  --review: #FEF6E4;
+  --success: #2BAB6F;
+  --destructive: #EF4343;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14161a;
-    --card-bg: #1d2025;
-    --text: #e7e9ec;
-    --muted: #9aa1ac;
-    --border: #33373f;
-    --accent: #6fa0e6;
-    --warn-bg: #3a2f1a;
-    --chargeable: #3a2323;
-    --wear: #22321f;
-    --review: #362f18;
+    --bg: #12181f;
+    --card-bg: #1b232c;
+    --text: #eaf1f8;
+    --muted: #9aabbb;
+    --border: #2b3742;
+    --muted-bg: #202a33;
+    --primary: #4791c9;
+    --primary-glow: #5fa4d8;
+    --warn-bg: #2c2412;
+    --chargeable: #331f1f;
+    --wear: #1c2f24;
+    --review: #2c2412;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #12181f; --card-bg: #1b232c; --text: #eaf1f8; --muted: #9aabbb;
+  --border: #2b3742; --muted-bg: #202a33; --primary: #4791c9; --primary-glow: #5fa4d8;
+  --warn-bg: #2c2412; --chargeable: #331f1f; --wear: #1c2f24; --review: #2c2412;
+}
+:root[data-theme="light"] {
+  --bg: #FAFAFA; --card-bg: #ffffff; --text: #003366; --muted: #627384;
+  --border: #DCE0E5; --muted-bg: #E8EBEE; --primary: #16609C; --primary-glow: #1D7BC9;
+  --warn-bg: #FEF6E4; --chargeable: #FDECEC; --wear: #E9F8F0; --review: #FEF6E4;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+h1, h2, h3, button, .button-link, .brand span {
+  font-family: "Raleway", -apple-system, sans-serif;
 }
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--border);
+  padding: 10px 28px;
+  border-bottom: 3px solid var(--gold);
   background: var(--card-bg);
 }
-.brand { font-weight: 600; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--navy);
+}
+.brand .logo { height: 40px; width: auto; display: block; }
+.brand span { font-weight: 700; font-size: 1.05rem; color: var(--text); }
 .logout { color: var(--muted); text-decoration: none; font-size: 14px; }
-main { padding: 32px 20px; display: flex; justify-content: center; }
+main { flex: 1; padding: 40px 20px; display: flex; justify-content: center; }
+.footer {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+}
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 28px 32px;
+  border-radius: 12px;
+  padding: 32px 36px;
   max-width: 640px;
   width: 100%;
+  box-shadow: 0 1px 3px rgba(0,51,102,0.06);
 }
 .card.wide { max-width: 1100px; overflow-x: auto; }
 .card.narrow { max-width: 360px; }
-h1 { font-size: 1.4rem; margin-top: 0; }
-label { display: block; margin: 16px 0 6px; font-size: 0.9rem; color: var(--muted); }
+h1 {
+  font-size: 1.5rem;
+  margin-top: 0;
+  color: var(--navy);
+  font-weight: 800;
+}
+label { display: block; margin: 16px 0 6px; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
 input[type=text], input[type=password], input[type=file] {
   width: 100%;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
   color: var(--text);
   font-size: 0.95rem;
 }
+input[type=text]:focus, input[type=password]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(22,96,156,0.15);
+}
 button, .button-link {
-  margin-top: 20px;
-  padding: 10px 18px;
+  margin-top: 22px;
+  padding: 11px 22px;
   border: none;
   border-radius: 6px;
-  background: var(--accent);
+  background: var(--primary);
   color: #fff;
   font-size: 0.95rem;
+  font-weight: 700;
   cursor: pointer;
   display: inline-block;
   text-decoration: none;
+  transition: background 0.15s ease;
 }
+button:hover, .button-link:hover { background: var(--primary-glow); }
 .disclaimer {
   font-size: 0.85rem;
   color: var(--muted);
   background: var(--warn-bg);
-  padding: 10px 14px;
+  border-left: 4px solid var(--gold);
+  padding: 12px 16px;
   border-radius: 6px;
 }
 .note { font-size: 0.85rem; color: var(--muted); }
-.flash p { color: #b3261e; }
-.warnings p { color: #b3261e; }
-table { border-collapse: collapse; width: 100%; margin-top: 16px; font-size: 0.88rem; }
-th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
-th { background: rgba(127,127,127,0.08); }
+.flash p { color: var(--destructive); font-weight: 600; }
+.warnings p { color: var(--destructive); }
+table { border-collapse: collapse; width: 100%; margin-top: 18px; font-size: 0.88rem; }
+th, td { border: 1px solid var(--border); padding: 9px 11px; text-align: left; vertical-align: top; }
+th {
+  background: var(--navy);
+  color: #fff;
+  font-family: "Raleway", sans-serif;
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
 tr.row-chargeable td { background: var(--chargeable); }
 tr.row-wear td { background: var(--wear); }
 tr.row-review td { background: var(--review); }

@@ -36,6 +36,15 @@ ROOM_KEYWORDS_SET = set(ROOM_KEYWORDS)
 
 LINE_ITEM_RE = re.compile(r"^(?P<item>[A-Za-z][A-Za-z0-9 /\-']{2,40}?)\s*[:\-]\s*(?P<rest>.+)$")
 
+# Items that are the property manager's own equipment/access, not part of the tenant's
+# unit condition -- always excluded from the comparison, never shown in the report.
+EXCLUDED_ITEM_KEYWORDS = ["lockbox", "lock box"]
+
+
+def is_excluded_item(item_name):
+    name = item_name.lower()
+    return any(kw in name for kw in EXCLUDED_ITEM_KEYWORDS)
+
 
 def load_knowledge_base():
     with open(KB_PATH) as f:
@@ -206,6 +215,8 @@ def diff_assessments(move_in_items, move_out_items, kb):
 
     results = []
     for key, out_item in move_out_idx.items():
+        if is_excluded_item(out_item.item):
+            continue
         in_item = move_in_idx.get(key)
         in_condition = in_item.condition if in_item else "(not present at move-in)"
         unchanged = in_item and in_item.condition.strip().lower() == out_item.condition.strip().lower() and not out_item.notes

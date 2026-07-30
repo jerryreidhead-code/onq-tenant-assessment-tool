@@ -100,4 +100,5 @@ def _parse_uploaded(file_storage):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # 5000 conflicts with macOS AirPlay Receiver -- use 8000 instead.
+    app.run(debug=True, port=int(os.environ.get("PORT", 8000)))

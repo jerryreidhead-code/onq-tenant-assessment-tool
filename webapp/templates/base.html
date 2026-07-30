@@ -4,11 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Tenant Charge Assessment Tool{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo-blue.png') }}">
 </head>
 <body>
   <header class="topbar">
-    <span class="brand">On Q Property Management &mdash; Assessment Comparison</span>
+    <a class="brand" href="{{ url_for('index') }}">
+      <img src="{{ url_for('static', filename='img/logo-blue.png') }}" alt="On Q Property Management" class="logo">
+      <span>Tenant Charge Assessment Tool</span>
+    </a>
     {% if session.get('authed') %}<a class="logout" href="{{ url_for('logout') }}">Log out</a>{% endif %}
   </header>
   <main>
@@ -21,5 +28,6 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="footer">On Q Property Management</footer>
 </body>
 </html>
