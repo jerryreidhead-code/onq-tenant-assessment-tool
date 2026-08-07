@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Tenant Charge Assessment Tool{% endblock %}</title>
+  <title>{% block title %}Disposition Tool{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
@@ -14,7 +14,8 @@
   <header class="topbar">
     <a class="brand" href="{{ url_for('index') }}">
       <img src="{{ url_for('static', filename='img/logo-blue.png') }}" alt="On Q Property Management" class="logo">
-      <span>Tenant Charge Assessment Tool</span>
+      <span class="brand-divider" aria-hidden="true"></span>
+      <span class="brand-title">Disposition Tool</span>
     </a>
     {% if session.get('authed') %}<a class="logout" href="{{ url_for('logout') }}">Log out</a>{% endif %}
   </header>

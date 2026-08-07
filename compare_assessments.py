@@ -330,11 +330,16 @@ APPLIANCE_ROOMS = {
 }
 
 
-def resolve_category(room, item, kb_by_key):
+WINDOW_COVERING_WORDS = ["window covering", "blind", "slat", "shade", "curtain"]
+
+
+def resolve_category(room, item, notes, kb_by_key):
     item_lower = item.strip().lower()
     room_lower = room.strip().lower()
     if item_lower == "overview" and room_lower in APPLIANCE_ROOMS:
         return kb_by_key.get("appliances")
+    if item_lower == "windows" and any(w in notes.lower() for w in WINDOW_COVERING_WORDS):
+        return kb_by_key.get("blinds_window_coverings")
     if item_lower in ROOM_DEPENDENT_CATEGORIES:
         mapping = ROOM_DEPENDENT_CATEGORIES[item_lower]
         key = mapping.get(room_lower, mapping["_default"])
@@ -352,10 +357,10 @@ CLEANING_ONLY_WORDS = ["dirty", "clean", "dust", "grille is dirty"]
 
 
 def classify_change(room, item, move_in, move_out, kb, kb_by_key):
-    category = resolve_category(room, item, kb_by_key)
     in_status, out_status = move_in["status"], move_out["status"]
     notes = move_out["notes"] or move_in["notes"]
     notes_lower = notes.lower()
+    category = resolve_category(room, item, notes, kb_by_key)
 
     in_count, out_count = move_in.get("max_count"), move_out.get("max_count")
     worsened = in_count is not None and out_count is not None and out_count > in_count

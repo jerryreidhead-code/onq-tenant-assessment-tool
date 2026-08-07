@@ -21,6 +21,7 @@
   --review-strong: #F5DA9C;
   --success: #2BAB6F;
   --destructive: #D93636;
+  --heading: var(--navy);
   --shadow: 0 1px 2px rgba(15,44,71,0.06), 0 8px 24px rgba(15,44,71,0.06);
 }
 @media (prefers-color-scheme: dark) {
@@ -40,6 +41,7 @@
     --wear-strong: #234a30;
     --review: #2c2412;
     --review-strong: #4a3a12;
+    --heading: #bcd4ea;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.25);
   }
 }
@@ -48,12 +50,14 @@
   --border: #2a3541; --muted-bg: #212b34; --primary: #4791c9; --primary-glow: #5fa4d8;
   --warn-bg: #2c2412; --chargeable: #33201f; --chargeable-strong: #57302e;
   --wear: #1a2e22; --wear-strong: #234a30; --review: #2c2412; --review-strong: #4a3a12;
+  --heading: #bcd4ea;
 }
 :root[data-theme="light"] {
   --bg: #F3F5F7; --card-bg: #ffffff; --text: #0f2c47; --muted: #627384;
   --border: #E1E5EA; --muted-bg: #EEF1F4; --primary: #16609C; --primary-glow: #1D7BC9;
   --warn-bg: #FEF6E4; --chargeable: #FDECEC; --chargeable-strong: #F6C6C6;
   --wear: #E9F8F0; --wear-strong: #B9E9CC; --review: #FEF6E4; --review-strong: #F5DA9C;
+  --heading: #003366;
 }
 
 * { box-sizing: border-box; }
@@ -69,23 +73,38 @@ body {
   display: flex;
   flex-direction: column;
 }
-h1, h2, h3, button, .button-link, .brand span {
+h1, h2, h3, button, .button-link, .brand-title {
   font-family: "Raleway", -apple-system, sans-serif;
 }
 
 /* Header */
 .topbar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 28px;
-  border-bottom: 3px solid var(--gold);
+  padding: 16px 32px;
   background: var(--card-bg);
-  box-shadow: 0 1px 0 rgba(15,44,71,0.04);
+  border-bottom: 1px solid var(--border);
 }
-.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--navy); }
-.brand .logo { height: 38px; width: auto; display: block; }
-.brand span { font-weight: 700; font-size: 1.02rem; color: var(--text); letter-spacing: 0.01em; }
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--navy), var(--gold));
+}
+.brand { display: flex; align-items: center; gap: 16px; text-decoration: none; }
+.brand .logo { height: 34px; width: auto; display: block; }
+.brand-divider { width: 1px; height: 24px; background: var(--border); display: block; }
+.brand-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--heading);
+  letter-spacing: 0.01em;
+}
 .logout {
   color: var(--muted);
   text-decoration: none;
@@ -132,7 +151,7 @@ main { flex: 1; padding: 48px 20px; display: flex; justify-content: center; alig
   display: flex; align-items: center; justify-content: center;
 }
 .card-icon svg { width: 24px; height: 24px; }
-h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--navy); font-weight: 800; line-height: 1.25; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--heading); font-weight: 800; line-height: 1.25; }
 .subtitle { margin: 0; color: var(--muted); font-size: 0.92rem; }
 .subtitle.center { text-align: center; margin-bottom: 22px; }
 .eyebrow {
