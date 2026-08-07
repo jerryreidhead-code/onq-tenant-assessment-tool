@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card narrow">
+<div class="card narrow login-card">
+  <img class="login-logo" src="{{ url_for('static', filename='img/logo-blue.png') }}" alt="On Q Property Management">
   <h1>Sign in</h1>
+  <p class="subtitle center">Tenant Charge Assessment Tool</p>
   <form method="post">
     <label for="password">Password</label>
     <input type="password" id="password" name="password" autofocus required>
-    <button type="submit">Sign in</button>
+    <button type="submit" class="full-width">Sign in</button>
   </form>
 </div>
 {% endblock %}

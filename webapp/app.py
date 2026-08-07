@@ -77,22 +77,31 @@ def compare():
 
     warnings = [w for w in (move_in_warn, move_out_warn) if w]
     results = ca.diff_assessments(move_in_items, move_out_items, kb)
+    summary = {
+        "chargeable": sum(1 for r in results if "CHARGEABLE" in r["verdict"]),
+        "no_charge": sum(1 for r in results if "NO CHARGE" in r["verdict"]),
+        "review": sum(1 for r in results if "NEEDS HUMAN REVIEW" in r["verdict"]),
+    }
 
     return render_template(
         "report.html",
         property_label=property_label,
         results=results,
         warnings=warnings,
+        summary=summary,
     )
 
 
 def _parse_uploaded(file_storage):
     """Parse an uploaded PDF entirely in memory; never touches disk."""
     buf = io.BytesIO(file_storage.read())
-    text, tables = ca.extract_text_and_tables(buf)
-    items = ca.parse_from_tables(tables) if tables else []
+    items = ca.parse_fastfield_pdf(buf)
     if not items:
-        items = ca.parse_from_text(text)
+        buf.seek(0)
+        text, tables = ca.extract_text_and_tables(buf)
+        items = ca.parse_from_tables(tables) if tables else []
+        if not items:
+            items = ca.parse_from_text(text)
     warning = None
     if not items:
         warning = f'Could not extract any line items from "{file_storage.filename}" -- report below may be empty or incomplete.'

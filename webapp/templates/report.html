@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card wide">
-  <h1>{{ property_label }}</h1>
+  <div class="report-header">
+    <div>
+      <p class="eyebrow">Comparison report</p>
+      <h1>{{ property_label }}</h1>
+    </div>
+    <a class="button-link secondary" href="{{ url_for('index') }}">Run another comparison</a>
+  </div>
+
   <p class="disclaimer">
     <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
     Arizona statute does not define "normal wear and tear." HUD figures below are industry
@@ -16,6 +23,22 @@
   {% endif %}
 
   {% if results %}
+  <div class="summary-row">
+    <div class="summary-tile tile-chargeable">
+      <span class="tile-count">{{ summary.chargeable }}</span>
+      <span class="tile-label">Likely chargeable</span>
+    </div>
+    <div class="summary-tile tile-wear">
+      <span class="tile-count">{{ summary.no_charge }}</span>
+      <span class="tile-label">No charge (resolved / pre-existing / wear &amp; tear)</span>
+    </div>
+    <div class="summary-tile tile-review">
+      <span class="tile-count">{{ summary.review }}</span>
+      <span class="tile-label">Needs human review</span>
+    </div>
+  </div>
+
+  <div class="table-scroll">
   <table>
     <thead>
       <tr>
@@ -25,27 +48,33 @@
     </thead>
     <tbody>
       {% for r in results %}
-      {% if 'CHARGEABLE' in r.verdict %}{% set row_class = 'row-chargeable' %}
-      {% elif 'WEAR' in r.verdict %}{% set row_class = 'row-wear' %}
-      {% else %}{% set row_class = 'row-review' %}{% endif %}
+      {% if 'CHARGEABLE' in r.verdict %}
+        {% set row_class = 'row-chargeable' %}{% set badge_class = 'badge-chargeable' %}{% set badge_text = 'Chargeable' %}
+      {% elif 'NO CHARGE' in r.verdict %}
+        {% set row_class = 'row-wear' %}{% set badge_class = 'badge-wear' %}{% set badge_text = 'No charge' %}
+      {% else %}
+        {% set row_class = 'row-review' %}{% set badge_class = 'badge-review' %}{% set badge_text = 'Needs review' %}
+      {% endif %}
       <tr class="{{ row_class }}">
         <td>{{ r.room }}</td>
-        <td>{{ r.item }}</td>
+        <td class="cell-item">{{ r.item }}</td>
         <td>{{ r.move_in_condition }}</td>
-        <td>{{ r.move_out_condition }}{% if r.move_out_notes %} &mdash; {{ r.move_out_notes }}{% endif %}</td>
-        <td>{{ r.verdict }}</td>
+        <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
+        <td>
+          <span class="badge {{ badge_class }}">{{ badge_text }}</span>
+          <div class="verdict-detail">{{ r.verdict }}</div>
+        </td>
         <td>{{ r.category }}</td>
-        <td>{{ r.az_citations | join('; ') }}</td>
-        <td>{{ r.hud_citation or '—' }}</td>
+        <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
+        <td class="cell-citation">{{ r.hud_citation or '—' }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  </div>
   <p class="note">{{ results | length }} item(s) flagged as changed between move-in and move-out.</p>
   {% else %}
-  <p>No changed items were detected between the two assessments.</p>
+  <p class="empty-state">No changed items were detected between the two assessments.</p>
   {% endif %}
-
-  <a class="button-link" href="{{ url_for('index') }}">Run another comparison</a>
 </div>
 {% endblock %}

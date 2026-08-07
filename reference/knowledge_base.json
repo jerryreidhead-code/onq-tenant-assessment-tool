@@ -99,14 +99,58 @@
     },
     {
       "key": "cabinets",
-      "label": "Cabinets",
-      "match_keywords": ["cabinet", "cupboard", "drawer"],
+      "label": "Cabinets / Counters / Closets",
+      "match_keywords": ["cabinet", "cupboard", "drawer", "counter", "closet", "closet track"],
       "wear_and_tear_examples": ["ordinary handle wear", "loose hinge"],
-      "damage_examples": ["broken cabinet door", "water damage from misuse", "missing cabinet front"],
+      "damage_examples": ["broken cabinet door", "water damage from misuse", "missing cabinet front", "paint scratched, chipped, damaged, worn", "closet track missing or damaged"],
       "useful_life_years": null,
       "az_citations": ["A.R.S. § 33-1341(6)", "A.R.S. § 33-1324(A)(2)"],
       "hud_citation": null,
-      "notes": "No HUD useful-life figure located for cabinets -- gap, do not invent a number."
+      "notes": "No HUD useful-life figure located for cabinets/counters/closets -- gap, do not invent a number."
+    },
+    {
+      "key": "light_fixtures",
+      "label": "Light Fixtures",
+      "match_keywords": ["light fixture", "light bulb", "ceiling fan"],
+      "wear_and_tear_examples": ["bulb burned out"],
+      "damage_examples": ["fixture hanging", "fixture not operating", "fixture missing", "fixture broken"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1324(A)(4)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": null,
+      "notes": "Landlord's default duty to maintain electrical fixtures under 33-1324(A)(4); tenant liable only for negligent/deliberate damage under 33-1341(6). No HUD useful-life figure located -- gap."
+    },
+    {
+      "key": "electrical",
+      "label": "Electrical (outlets, wallplates, panel)",
+      "match_keywords": ["electrical", "wallplate", "outlet", "breaker"],
+      "wear_and_tear_examples": [],
+      "damage_examples": ["wallplate missing", "wallplate damaged", "outlet broken"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1324(A)(4)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": null,
+      "notes": "No HUD useful-life figure located -- gap."
+    },
+    {
+      "key": "smoke_detector",
+      "label": "Smoke Detectors",
+      "match_keywords": ["smoke detector", "carbon monoxide detector"],
+      "wear_and_tear_examples": ["battery low"],
+      "damage_examples": ["missing", "disabled", "removed"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1324(A)(4)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": null,
+      "notes": "Battery replacement is routine maintenance, not tenant damage, absent evidence of deliberate disabling. No AZ smoke-detector-specific statute or HUD figure verified in this research pass -- flagged as a gap, relying on the general landlord-maintenance/tenant-damage clauses instead."
+    },
+    {
+      "key": "exterior_structure",
+      "label": "Exterior Structure (fences, gates, landscape, roof)",
+      "match_keywords": ["fence", "gate", "landscape", "roof", "yard"],
+      "wear_and_tear_examples": ["normal weathering"],
+      "damage_examples": ["broken fence", "broken gate", "dead landscaping from neglect"],
+      "useful_life_years": null,
+      "az_citations": ["A.R.S. § 33-1324(A)(2)", "A.R.S. § 33-1341(6)"],
+      "hud_citation": null,
+      "notes": "Landlord's default duty to keep premises fit and habitable under 33-1324(A)(2); landscaping upkeep is commonly reassigned to tenant by lease for single-family rentals -- check the lease before assuming either default applies. No HUD figure located -- gap."
     },
     {
       "key": "windows",

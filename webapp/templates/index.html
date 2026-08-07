@@ -1,25 +1,88 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card">
-  <h1>Compare a move-in / move-out assessment</h1>
+  <div class="card-header">
+    <div class="card-icon">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4M9 3v6h6M9 3l6 6m6 6-3-3m0 0-3 3m3-3v9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <div>
+      <h1>Compare a move-in / move-out assessment</h1>
+      <p class="subtitle">Upload both condition reports to generate a cited charge-suggestion draft.</p>
+    </div>
+  </div>
+
   <p class="disclaimer">
-    Results are a decision-support draft, not legal advice or a final charge determination.
+    <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
     Arizona statute does not define "normal wear and tear" &mdash; HUD figures cited in the
     report are industry guidance, not binding Arizona law. A human must review every
     suggested charge before it is communicated to a tenant.
   </p>
-  <form method="post" action="{{ url_for('compare') }}" enctype="multipart/form-data">
+
+  <form method="post" action="{{ url_for('compare') }}" enctype="multipart/form-data" id="compare-form">
     <label for="property">Property label</label>
     <input type="text" id="property" name="property" placeholder="e.g. 123 Main St, Tempe AZ">
 
-    <label for="move_in_pdf">Move-in assessment PDF</label>
-    <input type="file" id="move_in_pdf" name="move_in_pdf" accept="application/pdf" required>
+    <div class="dropzone-row">
+      <div class="dropzone" data-for="move_in_pdf">
+        <input type="file" id="move_in_pdf" name="move_in_pdf" accept="application/pdf" required>
+        <svg class="dz-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="dz-label">Move-in assessment</span>
+        <span class="dz-filename">Click or drop PDF here</span>
+      </div>
 
-    <label for="move_out_pdf">Move-out assessment PDF</label>
-    <input type="file" id="move_out_pdf" name="move_out_pdf" accept="application/pdf" required>
+      <div class="dropzone" data-for="move_out_pdf">
+        <input type="file" id="move_out_pdf" name="move_out_pdf" accept="application/pdf" required>
+        <svg class="dz-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v12m0-12 4 4m-4-4-4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="dz-label">Move-out assessment</span>
+        <span class="dz-filename">Click or drop PDF here</span>
+      </div>
+    </div>
 
-    <button type="submit">Compare</button>
+    <button type="submit" id="submit-btn">
+      <span class="btn-label">Compare</span>
+    </button>
   </form>
   <p class="note">Uploaded PDFs are processed in memory and are not stored on the server.</p>
 </div>
+
+<script>
+document.querySelectorAll('.dropzone').forEach(function (zone) {
+  var input = zone.querySelector('input[type=file]');
+  var filenameEl = zone.querySelector('.dz-filename');
+
+  function updateLabel() {
+    if (input.files && input.files[0]) {
+      zone.classList.add('has-file');
+      filenameEl.textContent = input.files[0].name;
+    } else {
+      zone.classList.remove('has-file');
+      filenameEl.textContent = 'Click or drop PDF here';
+    }
+  }
+
+  zone.addEventListener('click', function () { input.click(); });
+  input.addEventListener('change', updateLabel);
+  input.addEventListener('click', function (e) { e.stopPropagation(); });
+
+  ['dragenter', 'dragover'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.add('drag-over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (evt) {
+    zone.addEventListener(evt, function (e) { e.preventDefault(); zone.classList.remove('drag-over'); });
+  });
+  zone.addEventListener('drop', function (e) {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      input.files = e.dataTransfer.files;
+      updateLabel();
+    }
+  });
+});
+
+document.getElementById('compare-form').addEventListener('submit', function () {
+  var btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.querySelector('.btn-label').textContent = 'Comparing…';
+  btn.classList.add('is-loading');
+});
+</script>
 {% endblock %}

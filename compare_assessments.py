@@ -9,6 +9,11 @@ NOT LEGAL ADVICE. See reference/az_hud_reference.md for citations and known gaps
 guidance, not binding AZ law). A human must review every suggested charge before
 it is communicated to a tenant.
 
+The primary parser targets On Q's actual FastField-generated inspection PDFs: a
+coordinate-based form (notes column / category column / pass-fail-na column) with
+room section headers formatted "<Room> Pass N, Fail M". Generic table/line parsers
+are kept as a fallback for other PDF formats.
+
 Usage:
     python3 compare_assessments.py move_in.pdf move_out.pdf --property "123 Main St"
     python3 compare_assessments.py move_in.pdf move_out.pdf --dump-parsed   # debug parser
@@ -18,7 +23,6 @@ import json
 import re
 import sys
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 from pathlib import Path
 
 import pdfplumber
@@ -36,14 +40,18 @@ ROOM_KEYWORDS_SET = set(ROOM_KEYWORDS)
 
 LINE_ITEM_RE = re.compile(r"^(?P<item>[A-Za-z][A-Za-z0-9 /\-']{2,40}?)\s*[:\-]\s*(?P<rest>.+)$")
 
-# Items that are the property manager's own equipment/access, not part of the tenant's
-# unit condition -- always excluded from the comparison, never shown in the report.
-EXCLUDED_ITEM_KEYWORDS = ["lockbox", "lock box"]
+# Items that are the property manager's own equipment/access or pure informational
+# facts (not part of the tenant's unit condition) -- always excluded from the
+# comparison, checked against both the item name and its notes text.
+EXCLUDED_TEXT_KEYWORDS = ["lockbox", "lock box"]
+EXCLUDED_CATEGORIES = {"property service"}  # e.g. utility meter reading notes
 
 
-def is_excluded_item(item_name):
-    name = item_name.lower()
-    return any(kw in name for kw in EXCLUDED_ITEM_KEYWORDS)
+def is_excluded(item_name, notes):
+    haystack = f"{item_name} {notes}".lower()
+    if item_name.strip().lower() in EXCLUDED_CATEGORIES:
+        return True
+    return any(kw in haystack for kw in EXCLUDED_TEXT_KEYWORDS)
 
 
 def load_knowledge_base():
@@ -52,7 +60,7 @@ def load_knowledge_base():
 
 
 def extract_text_and_tables(pdf_path):
-    """Returns (full_text, list_of_tables) using pdfplumber."""
+    """Returns (full_text, list_of_tables) using pdfplumber. Used by the generic fallback parsers."""
     text_parts = []
     tables = []
     with pdfplumber.open(pdf_path) as pdf:
@@ -69,6 +77,100 @@ class AssessmentItem:
     condition: str
     notes: str = ""
 
+
+# ---------------------------------------------------------------------------
+# FastField coordinate-based parser
+#
+# On Q's inspection PDFs render each field as three columns at fixed x-ranges:
+#   notes/description (x0 < 350) | category label (350 <= x0 < 500) | pass/fail/na (x0 >= 500)
+# Room section headers appear as their own row: "<Room name>" (left) + "Pass N, Fail M" (right).
+# Notes text can wrap across additional lines that land either just before or just
+# after the category/status line in reading order, so fields are reconstructed by
+# nearest-neighbor assignment to the closest anchor (category+status pair), not by
+# simple top-to-bottom line grouping.
+# ---------------------------------------------------------------------------
+
+_HEADER_RE = re.compile(r"^Pass\s+\d+,\s*Fail\s+\d+$")
+_PAGE_GAP = 100000  # large fixed offset per page so pages never interleave when merged
+
+
+def _extract_global_words(pdf):
+    words = []
+    offset = 0
+    for page in pdf.pages:
+        for w in page.extract_words():
+            w = dict(w)
+            w["gtop"] = w["top"] + offset
+            words.append(w)
+        offset += _PAGE_GAP
+    return words
+
+
+def parse_fastfield_pdf(pdf_path):
+    with pdfplumber.open(pdf_path) as pdf:
+        words = _extract_global_words(pdf)
+
+    left = [w for w in words if w["x0"] < 350]
+    mid = [w for w in words if 350 <= w["x0"] < 500]
+    right = [w for w in words if w["x0"] >= 500]
+
+    right_by_top = {}
+    for w in right:
+        right_by_top.setdefault(round(w["gtop"], 1), []).append(w)
+
+    header_tops = set()
+    headers = {}
+    for top, ws in right_by_top.items():
+        joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"]))
+        if _HEADER_RE.match(joined):
+            header_tops.add(top)
+            name_words = [w["text"] for w in left if round(w["gtop"], 1) == top]
+            headers[top] = " ".join(name_words) if name_words else "(unnamed section)"
+
+    anchors = []
+    for top, ws in right_by_top.items():
+        if top in header_tops:
+            continue
+        joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"])).strip()
+        if joined.lower() in ("pass", "fail", "na"):
+            cat_words = sorted([w for w in mid if round(w["gtop"], 1) == top], key=lambda w: w["x0"])
+            category = " ".join(w["text"] for w in cat_words) if cat_words else "(unlabeled item)"
+            anchors.append({"top": top, "category": category, "status": joined.lower()})
+    anchors.sort(key=lambda a: a["top"])
+
+    if not anchors:
+        return []  # not a FastField-layout PDF -- let the caller fall back
+
+    items = []
+    for idx, anchor in enumerate(anchors):
+        top = anchor["top"]
+        prev_top = anchors[idx - 1]["top"] if idx > 0 else -1e12
+        next_top = anchors[idx + 1]["top"] if idx < len(anchors) - 1 else 1e18
+        window_start = (prev_top + top) / 2
+        window_end = (top + next_top) / 2
+        notes_words = sorted(
+            (w for w in left if window_start < w["gtop"] <= window_end),
+            key=lambda w: (w["gtop"], w["x0"]),
+        )
+        notes = " ".join(w["text"] for w in notes_words).strip()
+        items.append({"top": top, "category": anchor["category"], "status": anchor["status"], "notes": notes})
+
+    header_list = sorted(headers.items())
+    result = []
+    for it in items:
+        room = "General"
+        for htop, hname in header_list:
+            if htop < it["top"]:
+                room = hname
+            else:
+                break
+        result.append(AssessmentItem(room=room, item=it["category"], condition=it["status"], notes=it["notes"]))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Generic fallback parsers (used only if the FastField parser finds nothing)
+# ---------------------------------------------------------------------------
 
 def parse_from_tables(tables):
     """
@@ -115,8 +217,8 @@ def parse_from_tables(tables):
 
 def parse_from_text(text):
     """
-    Fallback line-based parser for non-tabular PDFs. Looks for room headers
-    (short line matching a known room keyword) and "Item: condition - notes"
+    Fallback line-based parser for non-tabular, non-FastField PDFs. Looks for room
+    headers (short line matching a known room keyword) and "Item: condition - notes"
     lines beneath them.
     """
     items = []
@@ -141,58 +243,144 @@ def parse_from_text(text):
 
 
 def parse_assessment(pdf_path):
+    items = parse_fastfield_pdf(pdf_path)
+    if items:
+        return items
     text, tables = extract_text_and_tables(pdf_path)
     items = parse_from_tables(tables) if tables else []
     if not items:
         items = parse_from_text(text)
-    return items, text
+    return items
+
+
+# ---------------------------------------------------------------------------
+# Aggregation -- FastField repeats a category multiple times per room (e.g. several
+# "Plumbing" checks per bathroom). Group by (room, category) and reduce each group
+# to one worst-case status ("fail" beats "pass" beats "na") with combined notes,
+# since the comparison is inherently per-room-per-category, not per fixture.
+# ---------------------------------------------------------------------------
+
+_STATUS_RANK = {"fail": 2, "pass": 1, "na": 0}
+_COUNT_RE = re.compile(r"\b(\d+)\s+(?:Issues?|Working|Not Working|Wallplates|Light Fixture|Window Covering)\b", re.I)
 
 
 def normalize_key(room, item):
     return f"{room.strip().lower()}::{re.sub(r'[^a-z0-9]+', ' ', item.strip().lower()).strip()}"
 
 
-def index_items(items):
-    return {normalize_key(it.room, it.item): it for it in items}
+def aggregate_items(items):
+    groups = {}
+    for it in items:
+        key = normalize_key(it.room, it.item)
+        g = groups.setdefault(key, {"room": it.room, "item": it.item, "status": "na", "notes": [], "max_count": None})
+        if _STATUS_RANK.get(it.condition, 0) > _STATUS_RANK.get(g["status"], 0):
+            g["status"] = it.condition
+        note = it.notes.strip()
+        if note and note not in g["notes"]:
+            g["notes"].append(note)
+        for m in _COUNT_RE.finditer(note):
+            n = int(m.group(1))
+            if g["max_count"] is None or n > g["max_count"]:
+                g["max_count"] = n
+    for g in groups.values():
+        g["notes"] = "; ".join(g["notes"])
+    return groups
 
 
-def fuzzy_match_category(item_name, notes, kb):
-    haystack = f"{item_name} {notes}".lower()
-    best, best_score = None, 0.0
-    for cat in kb["categories"]:
-        score = 0.0
-        for kw in cat["match_keywords"]:
-            if kw in haystack:
-                score = max(score, 1.0)
-            else:
-                score = max(score, SequenceMatcher(None, kw, haystack).ratio())
-        if score > best_score:
-            best_score, best = score, cat
-    return best if best_score >= 0.35 else None
+# ---------------------------------------------------------------------------
+# Category mapping -- FastField's own category vocabulary is now known directly
+# from real exports, so map it straight to the knowledge base instead of guessing
+# via fuzzy keyword matching against freeform text.
+# ---------------------------------------------------------------------------
+
+FASTFIELD_CATEGORY_MAP = {
+    "doors": "doors",
+    "garage door": "doors",
+    "walls": "paint_walls",
+    "paint": "paint_walls",
+    "floor": "carpet_flooring",
+    "cabinets": "cabinets",
+    "closet": "cabinets",
+    "counters": "cabinets",
+    "plumbing": "plumbing_fixtures",
+    "windows": "windows",
+    "light fixtures": "light_fixtures",
+    "smoke detector": "smoke_detector",
+    "filter": "hvac_filters",
+    "electrical": "electrical",
+    "door locks": "keys_locks",
+    "fences": "exterior_structure",
+    "gates": "exterior_structure",
+    "landscape": "exterior_structure",
+    "roof": "exterior_structure",
+    "thermostat": "appliances",
+    "unit": "appliances",
+}
+
+# Category names that mean different things depending on which room/section they're
+# under -- resolved by room name instead of a flat lookup.
+ROOM_DEPENDENT_CATEGORIES = {
+    "entry": {"access": "keys_locks", "_default": "cleaning"},
+    "whole property": {"_default": "keys_locks"},
+}
+
+APPLIANCE_ROOMS = {
+    "dishwasher", "dryer", "microwave", "oven", "refrigerator", "washer",
+    "water heater", "garbage disposal", "other appliance 1", "other appliance 2",
+}
 
 
-def classify_change(move_out_item, kb):
-    category = fuzzy_match_category(move_out_item.item, move_out_item.notes, kb)
-    text = f"{move_out_item.condition} {move_out_item.notes}".lower()
+def resolve_category(room, item, kb_by_key):
+    item_lower = item.strip().lower()
+    room_lower = room.strip().lower()
+    if item_lower == "overview" and room_lower in APPLIANCE_ROOMS:
+        return kb_by_key.get("appliances")
+    if item_lower in ROOM_DEPENDENT_CATEGORIES:
+        mapping = ROOM_DEPENDENT_CATEGORIES[item_lower]
+        key = mapping.get(room_lower, mapping["_default"])
+        return kb_by_key.get(key)
+    key = FASTFIELD_CATEGORY_MAP.get(item_lower)
+    return kb_by_key.get(key) if key else None
 
-    verdict = "NEEDS HUMAN REVIEW"
-    matched_examples = []
-    if category:
-        for phrase in category.get("damage_examples", []):
-            if phrase.lower() in text:
-                verdict = "LIKELY TENANT-CHARGEABLE"
-                matched_examples.append(phrase)
-        if verdict == "NEEDS HUMAN REVIEW":
-            for phrase in category.get("wear_and_tear_examples", []):
-                if phrase.lower() in text:
-                    verdict = "LIKELY NORMAL WEAR & TEAR (not chargeable)"
-                    matched_examples.append(phrase)
+
+DAMAGE_WORDS = [
+    "damage", "damaged", "broken", "hole", "holes", "crack", "cracked", "stain", "stains",
+    "scratch", "scratches", "missing", "torn", "chipped", "gouged", "water damage",
+    "not operating", "not working", "hanging", "does not function", "does not work",
+]
+CLEANING_ONLY_WORDS = ["dirty", "clean", "dust", "grille is dirty"]
+
+
+def classify_change(room, item, move_in, move_out, kb, kb_by_key):
+    category = resolve_category(room, item, kb_by_key)
+    in_status, out_status = move_in["status"], move_out["status"]
+    notes = move_out["notes"] or move_in["notes"]
+    notes_lower = notes.lower()
+
+    in_count, out_count = move_in.get("max_count"), move_out.get("max_count")
+    worsened = in_count is not None and out_count is not None and out_count > in_count
+
+    has_damage_word = any(w in notes_lower for w in DAMAGE_WORDS)
+    cleaning_only = any(w in notes_lower for w in CLEANING_ONLY_WORDS) and not has_damage_word
+
+    if in_status != "fail" and out_status == "fail":
+        if cleaning_only:
+            verdict = "NEEDS HUMAN REVIEW (possible cleaning charge -- only excess-cleaning beyond normal turnover is chargeable)"
+        elif has_damage_word or category is None:
+            verdict = "LIKELY TENANT-CHARGEABLE"
+        else:
+            verdict = "NEEDS HUMAN REVIEW"
+    elif in_status == "fail" and out_status != "fail":
+        verdict = "NO CHARGE — resolved by move-out"
+    elif in_status == "fail" and out_status == "fail":
+        verdict = "LIKELY TENANT-CHARGEABLE (worsened since move-in)" if worsened else "NO CHARGE — pre-existing at move-in"
+    else:
+        verdict = "NEEDS HUMAN REVIEW"
 
     return {
         "category": category["label"] if category else "Uncategorized",
         "verdict": verdict,
-        "matched_examples": matched_examples,
-        "az_citations": category["az_citations"] if category else [],
+        "az_citations": category["az_citations"] if category else ["A.R.S. § 33-1341(6)"],
         "hud_citation": category.get("hud_citation") if category else None,
         "useful_life_years": category.get("useful_life_years") if category else None,
     }
@@ -210,25 +398,29 @@ def compute_proration(useful_life_years, age_years, repair_cost):
 
 
 def diff_assessments(move_in_items, move_out_items, kb):
-    move_in_idx = index_items(move_in_items)
-    move_out_idx = index_items(move_out_items)
+    kb_by_key = {cat["key"]: cat for cat in kb["categories"]}
+    move_in_groups = aggregate_items(move_in_items)
+    move_out_groups = aggregate_items(move_out_items)
 
     results = []
-    for key, out_item in move_out_idx.items():
-        if is_excluded_item(out_item.item):
+    for key, out_g in move_out_groups.items():
+        if is_excluded(out_g["item"], out_g["notes"]):
             continue
-        in_item = move_in_idx.get(key)
-        in_condition = in_item.condition if in_item else "(not present at move-in)"
-        unchanged = in_item and in_item.condition.strip().lower() == out_item.condition.strip().lower() and not out_item.notes
-        if unchanged:
-            continue
-        classification = classify_change(out_item, kb)
+        in_g = move_in_groups.get(key, {"status": "na", "notes": "(not present at move-in)", "max_count": None})
+
+        no_status_change = in_g["status"] == out_g["status"]
+        no_notes_change = in_g["notes"].strip().lower() == out_g["notes"].strip().lower()
+        if no_status_change and no_notes_change:
+            continue  # nothing changed -- don't clutter the report
+
+        classification = classify_change(out_g["room"], out_g["item"], in_g, out_g, kb, kb_by_key)
         results.append({
-            "room": out_item.room,
-            "item": out_item.item,
-            "move_in_condition": in_condition,
-            "move_out_condition": out_item.condition,
-            "move_out_notes": out_item.notes,
+            "room": out_g["room"],
+            "item": out_g["item"],
+            "move_in_condition": in_g["status"],
+            "move_in_notes": in_g["notes"],
+            "move_out_condition": out_g["status"],
+            "move_out_notes": out_g["notes"],
             **classification,
         })
     return results
@@ -249,8 +441,10 @@ def render_report(property_label, results):
     for r in results:
         az = "; ".join(r["az_citations"]) or "—"
         hud = r["hud_citation"] or "—"
+        move_in = f"{r['move_in_condition']}" + (f" — {r['move_in_notes']}" if r["move_in_notes"] else "")
+        move_out = f"{r['move_out_condition']}" + (f" — {r['move_out_notes']}" if r["move_out_notes"] else "")
         lines.append(
-            f"| {r['room']} | {r['item']} | {r['move_in_condition']} | {r['move_out_condition']} "
+            f"| {r['room']} | {r['item']} | {move_in} | {move_out} "
             f"| {r['verdict']} | {r['category']} | {az} | {hud} |"
         )
     lines.append("")
@@ -268,8 +462,8 @@ def main():
     args = parser.parse_args()
 
     kb = load_knowledge_base()
-    move_in_items, _ = parse_assessment(args.move_in_pdf)
-    move_out_items, _ = parse_assessment(args.move_out_pdf)
+    move_in_items = parse_assessment(args.move_in_pdf)
+    move_out_items = parse_assessment(args.move_out_pdf)
 
     if args.dump_parsed:
         print(json.dumps({
