@@ -227,8 +227,8 @@ button.is-loading .btn-label::after {
 .disclaimer {
   font-size: 0.85rem;
   color: var(--muted);
-  background: var(--warn-bg);
-  border-left: 4px solid var(--gold);
+  background: var(--muted-bg);
+  border-left: 3px solid var(--primary);
   padding: 13px 16px;
   border-radius: 8px;
 }
@@ -236,7 +236,7 @@ button.is-loading .btn-label::after {
 .note { font-size: 0.83rem; color: var(--muted); margin-top: 14px; }
 .flash { background: var(--chargeable); border-left: 4px solid var(--destructive); padding: 10px 16px; border-radius: 8px; margin-bottom: 18px; }
 .flash p { color: var(--destructive); font-weight: 600; margin: 0; }
-.warnings { background: var(--warn-bg); border-left: 4px solid var(--gold); padding: 10px 16px; border-radius: 8px; margin: 16px 0; }
+.warnings { background: var(--review); border-left: 3px solid var(--review-strong); padding: 10px 16px; border-radius: 8px; margin: 16px 0; }
 .warnings p { color: var(--text); margin: 4px 0; font-size: 0.88rem; }
 
 /* Dropzones */
@@ -290,7 +290,16 @@ button.is-loading .btn-label::after {
 }
 
 .table-scroll { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
-table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+table { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 0.86rem; table-layout: fixed; }
+td, th { overflow-wrap: break-word; }
+th:nth-child(1), td:nth-child(1) { width: 9%; }
+th:nth-child(2), td:nth-child(2) { width: 10%; }
+th:nth-child(3), td:nth-child(3) { width: 16%; }
+th:nth-child(4), td:nth-child(4) { width: 22%; }
+th:nth-child(5), td:nth-child(5) { width: 13%; }
+th:nth-child(6), td:nth-child(6) { width: 13%; }
+th:nth-child(7), td:nth-child(7) { width: 9%; }
+th:nth-child(8), td:nth-child(8) { width: 8%; }
 th, td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
 th {
   background: var(--navy);
