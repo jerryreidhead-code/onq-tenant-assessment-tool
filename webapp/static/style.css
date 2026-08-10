@@ -18,7 +18,7 @@
   --review-strong: #B87C1B;
   --success: #3E7A45;
   --destructive: #C23934;
-  --heading: var(--navy);
+  --heading: var(--text);
   --shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 @media (prefers-color-scheme: dark) {
@@ -29,24 +29,24 @@
     --muted: #9aa3ab;
     --border: #33393f;
     --muted-bg: #23282d;
-    --primary: #4791c9;
-    --primary-dark: #6ba7d4;
+    --primary: #3C9AEB;
+    --primary-dark: #6BB2F0;
     --chargeable: #33201f;
     --wear: #1a2e22;
     --review: #2c2412;
-    --heading: #bcd4ea;
+    --heading: #e8eef4;
     --shadow: 0 1px 2px rgba(0,0,0,0.3);
   }
 }
 :root[data-theme="dark"] {
   --bg: #14181c; --card-bg: #1e2328; --text: #e8eef4; --muted: #9aa3ab;
-  --border: #33393f; --muted-bg: #23282d; --primary: #4791c9; --primary-dark: #6ba7d4;
-  --chargeable: #33201f; --wear: #1a2e22; --review: #2c2412; --heading: #bcd4ea;
+  --border: #33393f; --muted-bg: #23282d; --primary: #3C9AEB; --primary-dark: #6BB2F0;
+  --chargeable: #33201f; --wear: #1a2e22; --review: #2c2412; --heading: #e8eef4;
 }
 :root[data-theme="light"] {
   --bg: #F3F2F2; --card-bg: #ffffff; --text: #181818; --muted: #706E6B;
   --border: #DDDBDA; --muted-bg: #F3F2F2; --primary: #0D4B81; --primary-dark: #0A3C67;
-  --chargeable: #FDECEC; --wear: #E9F8F0; --review: #FFF6E1; --heading: #0D4B81;
+  --chargeable: #FDECEC; --wear: #E9F8F0; --review: #FFF6E1; --heading: #181818;
 }
 
 * { box-sizing: border-box; }
@@ -86,10 +86,9 @@ h1, h2, h3 { font-family: inherit; }
 .icon-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 0 4px; }
 .logo {
-  height: 24px;
+  height: 26px;
   width: auto;
   display: block;
-  filter: brightness(0) invert(1);
 }
 .brand-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.35); display: block; }
 .brand-title { font-weight: 600; font-size: 1rem; color: #fff; letter-spacing: 0.01em; }
