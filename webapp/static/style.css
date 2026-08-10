@@ -162,6 +162,14 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; color: var(--heading); font-weight: 800
   text-transform: uppercase;
   color: var(--gold);
 }
+.section-heading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 28px 0 10px;
+}
+#toggle-more { margin: 18px 0 0; }
+#full-analysis { margin-top: 20px; }
 
 label { display: block; margin: 18px 0 7px; font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 input[type=text], input[type=password] {

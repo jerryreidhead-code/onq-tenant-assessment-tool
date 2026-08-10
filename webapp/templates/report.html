@@ -1,4 +1,38 @@
 {% extends "base.html" %}
+
+{% macro row_class_for(verdict) -%}
+  {%- if 'CHARGEABLE' in verdict -%}row-chargeable
+  {%- elif 'NO CHARGE' in verdict -%}row-wear
+  {%- else -%}row-review
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro badge_for(verdict) -%}
+  {%- if 'CHARGEABLE' in verdict -%}badge-chargeable|Chargeable
+  {%- elif 'NO CHARGE' in verdict -%}badge-wear|No charge
+  {%- else -%}badge-review|Needs review
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro render_rows(rows) %}
+  {% for r in rows %}
+  {% set badge = badge_for(r.verdict).split('|') %}
+  <tr class="{{ row_class_for(r.verdict) }}">
+    <td>{{ r.room }}</td>
+    <td class="cell-item">{{ r.item }}</td>
+    <td>{{ r.move_in_condition }}</td>
+    <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
+    <td>
+      <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
+      <div class="verdict-detail">{{ r.verdict }}</div>
+    </td>
+    <td>{{ r.category }}</td>
+    <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
+    <td class="cell-citation">{{ r.hud_citation or '—' }}</td>
+  </tr>
+  {% endfor %}
+{% endmacro %}
+
 {% block content %}
 <div class="card wide">
   <div class="report-header">
@@ -22,7 +56,7 @@
     </div>
   {% endif %}
 
-  {% if results %}
+  {% if total_count %}
   <div class="summary-row">
     <div class="summary-tile tile-chargeable">
       <span class="tile-count">{{ summary.chargeable }}</span>
@@ -38,41 +72,57 @@
     </div>
   </div>
 
+  <h2 class="section-heading">Likely chargeable</h2>
+  {% if chargeable_results %}
   <div class="table-scroll">
-  <table>
-    <thead>
-      <tr>
-        <th>Room</th><th>Item</th><th>Move-In</th><th>Move-Out</th>
-        <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in results %}
-      {% if 'CHARGEABLE' in r.verdict %}
-        {% set row_class = 'row-chargeable' %}{% set badge_class = 'badge-chargeable' %}{% set badge_text = 'Chargeable' %}
-      {% elif 'NO CHARGE' in r.verdict %}
-        {% set row_class = 'row-wear' %}{% set badge_class = 'badge-wear' %}{% set badge_text = 'No charge' %}
-      {% else %}
-        {% set row_class = 'row-review' %}{% set badge_class = 'badge-review' %}{% set badge_text = 'Needs review' %}
-      {% endif %}
-      <tr class="{{ row_class }}">
-        <td>{{ r.room }}</td>
-        <td class="cell-item">{{ r.item }}</td>
-        <td>{{ r.move_in_condition }}</td>
-        <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
-        <td>
-          <span class="badge {{ badge_class }}">{{ badge_text }}</span>
-          <div class="verdict-detail">{{ r.verdict }}</div>
-        </td>
-        <td>{{ r.category }}</td>
-        <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
-        <td class="cell-citation">{{ r.hud_citation or '—' }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <table>
+      <thead>
+        <tr>
+          <th>Room</th><th>Item</th><th>Move-In</th><th>Move-Out</th>
+          <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
+        </tr>
+      </thead>
+      <tbody>{{ render_rows(chargeable_results) }}</tbody>
+    </table>
   </div>
-  <p class="note">{{ results | length }} item(s) flagged as changed between move-in and move-out.</p>
+  {% else %}
+  <p class="empty-state">No items were flagged as likely chargeable.</p>
+  {% endif %}
+
+  {% if other_results %}
+  <button type="button" class="button-link secondary" id="toggle-more">
+    <span id="toggle-more-label">More info — show full analysis ({{ other_results | length }} more item{{ 's' if other_results|length != 1 }})</span>
+  </button>
+
+  <div id="full-analysis" hidden>
+    <h2 class="section-heading">Full analysis</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Room</th><th>Item</th><th>Move-In</th><th>Move-Out</th>
+            <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
+          </tr>
+        </thead>
+        <tbody>{{ render_rows(other_results) }}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('toggle-more').addEventListener('click', function () {
+      var panel = document.getElementById('full-analysis');
+      var label = document.getElementById('toggle-more-label');
+      var showing = !panel.hidden;
+      panel.hidden = showing;
+      label.textContent = showing
+        ? "More info — show full analysis ({{ other_results | length }} more item{{ 's' if other_results|length != 1 }})"
+        : "Hide full analysis";
+    });
+  </script>
+  {% endif %}
+
+  <p class="note">{{ total_count }} item(s) flagged as changed between move-in and move-out.</p>
   {% else %}
   <p class="empty-state">No changed items were detected between the two assessments.</p>
   {% endif %}
