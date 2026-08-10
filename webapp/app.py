@@ -19,7 +19,7 @@ from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
-from flask import Flask, Response, abort, render_template, request, session, redirect, url_for, flash
+from flask import Flask, Response, abort, jsonify, render_template, request, session, redirect, url_for, flash
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import compare_assessments as ca  # noqa: E402
@@ -118,12 +118,28 @@ def index():
     return render_template("index.html", recent_reports=_recent_reports())
 
 
+@app.route("/extract-address", methods=["POST"])
+@login_required
+def extract_address():
+    """Best-effort address lookup for a single uploaded PDF, used to auto-fill the
+    property label as soon as a file is chosen, before the user hits Compare."""
+    pdf_file = request.files.get("pdf")
+    if not pdf_file:
+        return jsonify({"address": None})
+    buf = io.BytesIO(pdf_file.read())
+    try:
+        address = ca.extract_property_address(buf)
+    except Exception:
+        address = None
+    return jsonify({"address": address})
+
+
 @app.route("/compare", methods=["POST"])
 @login_required
 def compare():
     move_in_file = request.files.get("move_in_pdf")
     move_out_file = request.files.get("move_out_pdf")
-    property_label = request.form.get("property") or "Unnamed Property"
+    property_label = request.form.get("property")
 
     if not move_in_file or not move_out_file:
         flash("Please upload both a move-in and a move-out assessment PDF.")
@@ -133,6 +149,15 @@ def compare():
 
     move_in_items, move_in_warn = _parse_uploaded(move_in_file)
     move_out_items, move_out_warn = _parse_uploaded(move_out_file)
+
+    if not property_label:
+        move_in_file.seek(0)
+        move_out_file.seek(0)
+        property_label = (
+            ca.extract_property_address(io.BytesIO(move_in_file.read()))
+            or ca.extract_property_address(io.BytesIO(move_out_file.read()))
+            or "Unnamed Property"
+        )
 
     warnings = [w for w in (move_in_warn, move_out_warn) if w]
     results = ca.diff_assessments(move_in_items, move_out_items, kb)

@@ -13,6 +13,7 @@
   <form method="post" action="{{ url_for('compare') }}" enctype="multipart/form-data" id="compare-form">
     <label for="property">Property label</label>
     <input type="text" id="property" name="property" placeholder="e.g. 123 Main St, Tempe AZ">
+    <span class="autofill-hint" id="autofill-hint" hidden></span>
 
     <div class="dropzone-row">
       <div class="dropzone" data-for="move_in_pdf">
@@ -55,6 +56,28 @@
 </div>
 
 <script>
+var propertyInput = document.getElementById('property');
+var autofillHint = document.getElementById('autofill-hint');
+
+function tryAutofillAddress(file) {
+  if (!file || propertyInput.value.trim()) return;
+  autofillHint.hidden = false;
+  autofillHint.textContent = 'Looking up address from PDF…';
+  var formData = new FormData();
+  formData.append('pdf', file);
+  fetch('{{ url_for("extract_address") }}', { method: 'POST', body: formData })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.address && !propertyInput.value.trim()) {
+        propertyInput.value = data.address;
+        autofillHint.textContent = 'Detected from PDF — edit if needed.';
+      } else if (!propertyInput.value.trim()) {
+        autofillHint.hidden = true;
+      }
+    })
+    .catch(function () { autofillHint.hidden = true; });
+}
+
 document.querySelectorAll('.dropzone').forEach(function (zone) {
   var input = zone.querySelector('input[type=file]');
   var filenameEl = zone.querySelector('.dz-filename');
@@ -63,6 +86,7 @@ document.querySelectorAll('.dropzone').forEach(function (zone) {
     if (input.files && input.files[0]) {
       zone.classList.add('has-file');
       filenameEl.textContent = input.files[0].name;
+      tryAutofillAddress(input.files[0]);
     } else {
       zone.classList.remove('has-file');
       filenameEl.textContent = 'Click or drop PDF here';

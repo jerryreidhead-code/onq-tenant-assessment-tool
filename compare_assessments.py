@@ -156,6 +156,35 @@ def _render_field_images(pdf, images_by_field):
     return result
 
 
+def extract_property_address(pdf_path):
+    """Reads the "Property Address" field on page 1 of a FastField assessment PDF.
+    That field sits in the left column with On Q's own office address in a separate
+    column to the right on the same lines, so this only collects words left of x=200
+    to avoid pulling in the office address. Returns None if the PDF isn't in this format."""
+    with pdfplumber.open(pdf_path) as pdf:
+        if not pdf.pages:
+            return None
+        words = pdf.pages[0].extract_words()
+
+    label_top = None
+    for i, w in enumerate(words):
+        if w["text"] == "Property" and i + 1 < len(words) and words[i + 1]["text"] == "Address" and w["x0"] < 200:
+            label_top = w["top"]
+            break
+    if label_top is None:
+        return None
+
+    addr_words = [w for w in words if w["x0"] < 200 and label_top < w["top"] <= label_top + 45]
+    lines = {}
+    for w in addr_words:
+        lines.setdefault(round(w["top"], 1), []).append(w)
+    parts = []
+    for top in sorted(lines):
+        line_words = sorted(lines[top], key=lambda w: w["x0"])
+        parts.append(" ".join(w["text"] for w in line_words))
+    return ", ".join(parts) if parts else None
+
+
 def parse_fastfield_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         words = _extract_global_words(pdf)
