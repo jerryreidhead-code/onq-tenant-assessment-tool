@@ -77,19 +77,23 @@ def compare():
 
     warnings = [w for w in (move_in_warn, move_out_warn) if w]
     results = ca.diff_assessments(move_in_items, move_out_items, kb)
-    chargeable_results = [r for r in results if "CHARGEABLE" in r["verdict"]]
-    other_results = [r for r in results if "CHARGEABLE" not in r["verdict"]]
+    for r in results:
+        if "CHARGEABLE" in r["verdict"]:
+            r["verdict_group"] = "chargeable"
+        elif "NO CHARGE" in r["verdict"]:
+            r["verdict_group"] = "wear"
+        else:
+            r["verdict_group"] = "review"
     summary = {
-        "chargeable": len(chargeable_results),
-        "no_charge": sum(1 for r in results if "NO CHARGE" in r["verdict"]),
-        "review": sum(1 for r in results if "NEEDS HUMAN REVIEW" in r["verdict"]),
+        "chargeable": sum(1 for r in results if r["verdict_group"] == "chargeable"),
+        "no_charge": sum(1 for r in results if r["verdict_group"] == "wear"),
+        "review": sum(1 for r in results if r["verdict_group"] == "review"),
     }
 
     return render_template(
         "report.html",
         property_label=property_label,
-        chargeable_results=chargeable_results,
-        other_results=other_results,
+        results=results,
         total_count=len(results),
         warnings=warnings,
         summary=summary,

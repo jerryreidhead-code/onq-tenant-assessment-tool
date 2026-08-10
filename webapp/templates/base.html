@@ -4,20 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Disposition Tool{% endblock %}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="icon" href="{{ url_for('static', filename='img/logo-blue.png') }}">
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="{{ url_for('index') }}">
-      <img src="{{ url_for('static', filename='img/logo-blue.png') }}" alt="On Q Property Management" class="logo">
-      <span class="brand-divider" aria-hidden="true"></span>
-      <span class="brand-title">Disposition Tool</span>
-    </a>
-    {% if session.get('authed') %}<a class="logout" href="{{ url_for('logout') }}">Log out</a>{% endif %}
+    <div class="topbar-left">
+      <button type="button" class="icon-btn hamburger-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <a class="brand" href="{{ url_for('index') }}">
+        <span class="logo-chip"><img src="{{ url_for('static', filename='img/logo-blue.png') }}" alt="On Q Property Management" class="logo"></span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-title">Disposition Tool</span>
+      </a>
+    </div>
+    <div class="topbar-right">
+      <button type="button" class="icon-btn" aria-label="Search">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      {% if session.get('authed') %}<a class="avatar" href="{{ url_for('logout') }}" title="Log out">⏻</a>{% endif %}
+    </div>
   </header>
   <main>
     {% with messages = get_flashed_messages() %}

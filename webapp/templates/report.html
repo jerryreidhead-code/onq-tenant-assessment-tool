@@ -1,101 +1,52 @@
 {% extends "base.html" %}
 
-{% macro row_class_for(verdict) -%}
-  {%- if 'CHARGEABLE' in verdict -%}row-chargeable
-  {%- elif 'NO CHARGE' in verdict -%}row-wear
-  {%- else -%}row-review
-  {%- endif -%}
-{%- endmacro %}
-
-{% macro badge_for(verdict) -%}
-  {%- if 'CHARGEABLE' in verdict -%}badge-chargeable|Chargeable
-  {%- elif 'NO CHARGE' in verdict -%}badge-wear|No charge
+{% macro badge_for(group) -%}
+  {%- if group == 'chargeable' -%}badge-chargeable|Chargeable
+  {%- elif group == 'wear' -%}badge-wear|No charge
   {%- else -%}badge-review|Needs review
   {%- endif -%}
 {%- endmacro %}
 
-{% macro render_rows(rows) %}
-  {% for r in rows %}
-  {% set badge = badge_for(r.verdict).split('|') %}
-  <tr class="{{ row_class_for(r.verdict) }}">
-    <td>{{ r.room }}</td>
-    <td class="cell-item">{{ r.item }}</td>
-    <td>{{ r.move_in_condition }}</td>
-    <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
-    <td>
-      <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
-      <div class="verdict-detail">{{ r.verdict }}</div>
-    </td>
-    <td>{{ r.category }}</td>
-    <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
-    <td class="cell-citation">{{ r.hud_citation or '—' }}</td>
-  </tr>
-  {% endfor %}
-{% endmacro %}
-
 {% block content %}
-<div class="card wide">
-  <div class="report-header">
-    <div>
-      <p class="eyebrow">Comparison report</p>
-      <h1>{{ property_label }}</h1>
+<div class="disposition-shell">
+  <nav class="filter-sidebar" id="filter-sidebar">
+    <button type="button" class="filter-item" data-filter="all">
+      <span>All</span><span class="filter-count">{{ total_count }}</span>
+    </button>
+    <button type="button" class="filter-item active" data-filter="chargeable">
+      <span>Likely Chargeable</span><span class="filter-count">{{ summary.chargeable }}</span>
+    </button>
+    <button type="button" class="filter-item" data-filter="wear">
+      <span>No Charge</span><span class="filter-count">{{ summary.no_charge }}</span>
+    </button>
+    <button type="button" class="filter-item" data-filter="review">
+      <span>Needs Review</span><span class="filter-count">{{ summary.review }}</span>
+    </button>
+  </nav>
+
+  <div class="disposition-main">
+    <div class="disposition-toolbar">
+      <div>
+        <p class="eyebrow">Comparison report</p>
+        <h1>{{ property_label }}</h1>
+      </div>
+      <a class="button-link secondary" href="{{ url_for('index') }}">Run another comparison</a>
     </div>
-    <a class="button-link secondary" href="{{ url_for('index') }}">Run another comparison</a>
-  </div>
 
-  <p class="disclaimer">
-    <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
-    Arizona statute does not define "normal wear and tear." HUD figures below are industry
-    guidance, not binding Arizona law. A human must review every suggested charge before it
-    is communicated to a tenant.
-  </p>
+    <p class="disclaimer">
+      <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
+      Arizona statute does not define "normal wear and tear." HUD figures below are industry
+      guidance, not binding Arizona law. A human must review every suggested charge before it
+      is communicated to a tenant.
+    </p>
 
-  {% if warnings %}
-    <div class="warnings">
-      {% for w in warnings %}<p>&#9888; {{ w }}</p>{% endfor %}
-    </div>
-  {% endif %}
+    {% if warnings %}
+      <div class="warnings">
+        {% for w in warnings %}<p>&#9888; {{ w }}</p>{% endfor %}
+      </div>
+    {% endif %}
 
-  {% if total_count %}
-  <div class="summary-row">
-    <div class="summary-tile tile-chargeable">
-      <span class="tile-count">{{ summary.chargeable }}</span>
-      <span class="tile-label">Likely chargeable</span>
-    </div>
-    <div class="summary-tile tile-wear">
-      <span class="tile-count">{{ summary.no_charge }}</span>
-      <span class="tile-label">No charge (resolved / pre-existing / wear &amp; tear)</span>
-    </div>
-    <div class="summary-tile tile-review">
-      <span class="tile-count">{{ summary.review }}</span>
-      <span class="tile-label">Needs human review</span>
-    </div>
-  </div>
-
-  <h2 class="section-heading">Likely chargeable</h2>
-  {% if chargeable_results %}
-  <div class="table-scroll">
-    <table>
-      <thead>
-        <tr>
-          <th>Room</th><th>Item</th><th>Move-In</th><th>Move-Out</th>
-          <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
-        </tr>
-      </thead>
-      <tbody>{{ render_rows(chargeable_results) }}</tbody>
-    </table>
-  </div>
-  {% else %}
-  <p class="empty-state">No items were flagged as likely chargeable.</p>
-  {% endif %}
-
-  {% if other_results %}
-  <button type="button" class="button-link secondary" id="toggle-more">
-    <span id="toggle-more-label">More info — show full analysis ({{ other_results | length }} more item{{ 's' if other_results|length != 1 }})</span>
-  </button>
-
-  <div id="full-analysis" hidden>
-    <h2 class="section-heading">Full analysis</h2>
+    {% if results %}
     <div class="table-scroll">
       <table>
         <thead>
@@ -104,27 +55,63 @@
             <th>Verdict</th><th>Category</th><th>AZ Citation</th><th>HUD Citation</th>
           </tr>
         </thead>
-        <tbody>{{ render_rows(other_results) }}</tbody>
+        <tbody id="results-body">
+          {% for r in results %}
+          {% set badge = badge_for(r.verdict_group).split('|') %}
+          <tr data-verdict-group="{{ r.verdict_group }}">
+            <td>{{ r.room }}</td>
+            <td class="cell-item">{{ r.item }}</td>
+            <td>{{ r.move_in_condition }}</td>
+            <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
+            <td>
+              <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
+              <div class="verdict-detail">{{ r.verdict }}</div>
+            </td>
+            <td>{{ r.category }}</td>
+            <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
+            <td class="cell-citation">{{ r.hud_citation or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
       </table>
     </div>
+    <p class="note" id="visible-count-note"></p>
+    {% else %}
+    <p class="empty-state">No changed items were detected between the two assessments.</p>
+    {% endif %}
   </div>
-
-  <script>
-    document.getElementById('toggle-more').addEventListener('click', function () {
-      var panel = document.getElementById('full-analysis');
-      var label = document.getElementById('toggle-more-label');
-      var showing = !panel.hidden;
-      panel.hidden = showing;
-      label.textContent = showing
-        ? "More info — show full analysis ({{ other_results | length }} more item{{ 's' if other_results|length != 1 }})"
-        : "Hide full analysis";
-    });
-  </script>
-  {% endif %}
-
-  <p class="note">{{ total_count }} item(s) flagged as changed between move-in and move-out.</p>
-  {% else %}
-  <p class="empty-state">No changed items were detected between the two assessments.</p>
-  {% endif %}
 </div>
+
+<script>
+(function () {
+  var sidebar = document.getElementById('filter-sidebar');
+  var rows = document.querySelectorAll('#results-body tr');
+  var note = document.getElementById('visible-count-note');
+  var totalCount = {{ total_count }};
+
+  function applyFilter(filter) {
+    var visible = 0;
+    rows.forEach(function (row) {
+      var show = filter === 'all' || row.dataset.verdictGroup === filter;
+      row.hidden = !show;
+      if (show) visible++;
+    });
+    if (note) {
+      note.textContent = filter === 'all'
+        ? totalCount + ' item(s) flagged as changed between move-in and move-out.'
+        : visible + ' of ' + totalCount + ' item(s) shown.';
+    }
+  }
+
+  sidebar.querySelectorAll('.filter-item').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      sidebar.querySelectorAll('.filter-item').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      applyFilter(btn.dataset.filter);
+    });
+  });
+
+  applyFilter('chargeable');
+})();
+</script>
 {% endblock %}
