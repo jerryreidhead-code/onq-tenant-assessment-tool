@@ -1,9 +1,9 @@
 :root {
   color-scheme: light dark;
-  --navy: #16325C;
-  --primary: #16609C;
-  --primary-dark: #0E4A7B;
-  --gold: #E8BA30;
+  --navy: #0D4B81;
+  --primary: #0D4B81;
+  --primary-dark: #0A3C67;
+  --gold: #E8C259;
   --bg: #F3F2F2;
   --card-bg: #ffffff;
   --text: #181818;
@@ -45,8 +45,8 @@
 }
 :root[data-theme="light"] {
   --bg: #F3F2F2; --card-bg: #ffffff; --text: #181818; --muted: #706E6B;
-  --border: #DDDBDA; --muted-bg: #F3F2F2; --primary: #16609C; --primary-dark: #0E4A7B;
-  --chargeable: #FDECEC; --wear: #E9F8F0; --review: #FFF6E1; --heading: #16325C;
+  --border: #DDDBDA; --muted-bg: #F3F2F2; --primary: #0D4B81; --primary-dark: #0A3C67;
+  --chargeable: #FDECEC; --wear: #E9F8F0; --review: #FFF6E1; --heading: #0D4B81;
 }
 
 * { box-sizing: border-box; }
