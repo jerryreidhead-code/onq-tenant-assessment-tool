@@ -85,8 +85,12 @@ h1, h2, h3 { font-family: inherit; }
 .icon-btn:hover { background: rgba(255,255,255,0.15); }
 .icon-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; padding: 0 4px; }
-.logo-chip { background: #fff; border-radius: 4px; padding: 3px 7px; display: flex; align-items: center; line-height: 0; }
-.logo-chip .logo { height: 20px; width: auto; display: block; }
+.logo {
+  height: 24px;
+  width: auto;
+  display: block;
+  filter: brightness(0) invert(1);
+}
 .brand-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.35); display: block; }
 .brand-title { font-weight: 600; font-size: 1rem; color: #fff; letter-spacing: 0.01em; }
 .avatar {
