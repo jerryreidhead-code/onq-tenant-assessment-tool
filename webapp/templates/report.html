@@ -11,7 +11,7 @@
   {% if images %}
   <div class="photo-strip">
     {% for src in images[:4] %}
-    <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" class="thumb" alt="Assessment photo"></a>
+    <a href="{{ src }}" target="_blank" rel="noopener"><img data-src="{{ src }}" class="thumb" alt="Assessment photo" loading="lazy" decoding="async"></a>
     {% endfor %}
     {% if images | length > 4 %}<span class="thumb-more">+{{ images | length - 4 }}</span>{% endif %}
   </div>
@@ -100,12 +100,22 @@
   var note = document.getElementById('visible-count-note');
   var totalCount = {{ total_count }};
 
+  function activateImages(row) {
+    row.querySelectorAll('img[data-src]').forEach(function (img) {
+      img.src = img.dataset.src;
+      img.removeAttribute('data-src');
+    });
+  }
+
   function applyFilter(filter) {
     var visible = 0;
     rows.forEach(function (row) {
       var show = filter === 'all' || row.dataset.verdictGroup === filter;
       row.hidden = !show;
-      if (show) visible++;
+      if (show) {
+        visible++;
+        activateImages(row);
+      }
     });
     if (note) {
       note.textContent = filter === 'all'
