@@ -291,16 +291,16 @@ button.is-loading .btn-label::after {
 }
 
 .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
-table { border-collapse: collapse; width: 100%; min-width: 980px; font-size: 0.85rem; table-layout: fixed; background: var(--card-bg); }
+table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 0.85rem; table-layout: fixed; background: var(--card-bg); }
 td, th { overflow-wrap: break-word; }
-th:nth-child(1), td:nth-child(1) { width: 9%; }
-th:nth-child(2), td:nth-child(2) { width: 10%; }
-th:nth-child(3), td:nth-child(3) { width: 16%; }
-th:nth-child(4), td:nth-child(4) { width: 22%; }
+th:nth-child(1), td:nth-child(1) { width: 8%; }
+th:nth-child(2), td:nth-child(2) { width: 9%; }
+th:nth-child(3), td:nth-child(3) { width: 13%; }
+th:nth-child(4), td:nth-child(4) { width: 20%; }
 th:nth-child(5), td:nth-child(5) { width: 13%; }
 th:nth-child(6), td:nth-child(6) { width: 13%; }
-th:nth-child(7), td:nth-child(7) { width: 9%; }
-th:nth-child(8), td:nth-child(8) { width: 8%; }
+th:nth-child(7), td:nth-child(7) { width: 13%; }
+th:nth-child(8), td:nth-child(8) { width: 11%; }
 th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
 th {
   background: var(--muted-bg);
@@ -316,7 +316,7 @@ tbody tr:hover td { background: var(--muted-bg); }
 tbody tr:last-child td { border-bottom: none; }
 .cell-item { font-weight: 600; }
 .cell-notes { color: var(--muted); font-style: normal; }
-.cell-citation { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.cell-citation { font-size: 0.78rem; color: var(--muted); white-space: normal; }
 
 .badge {
   display: inline-block;
