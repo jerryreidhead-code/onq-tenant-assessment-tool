@@ -2,21 +2,12 @@
 {% block content %}
 <div class="page-center">
 <div class="card">
-  <div class="card-header">
-    <div class="card-icon">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4M9 3v6h6M9 3l6 6m6 6-3-3m0 0-3 3m3-3v9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-    <div>
-      <h1>Compare a move-in / move-out assessment</h1>
-      <p class="subtitle">Upload both condition reports to generate a cited charge-suggestion draft.</p>
-    </div>
-  </div>
+  <h1>Compare a move-in / move-out assessment</h1>
+  <p class="subtitle">Upload both condition reports to generate a cited charge-suggestion draft.</p>
 
-  <p class="disclaimer">
-    <strong>Decision-support draft, not legal advice or a final charge determination.</strong>
-    Arizona statute does not define "normal wear and tear" &mdash; HUD figures cited in the
-    report are industry guidance, not binding Arizona law. A human must review every
-    suggested charge before it is communicated to a tenant.
+  <p class="disclaimer-inline">
+    Decision-support draft, not legal advice or a final charge determination — a human must
+    review every suggested charge before it's communicated to a tenant.
   </p>
 
   <form method="post" action="{{ url_for('compare') }}" enctype="multipart/form-data" id="compare-form">
