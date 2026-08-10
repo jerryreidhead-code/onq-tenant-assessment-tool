@@ -441,9 +441,25 @@ def classify_change(room, item, move_in, move_out, kb, kb_by_key):
     elif in_status == "fail" and out_status != "fail":
         verdict = "NO CHARGE — resolved by move-out"
     elif in_status == "fail" and out_status == "fail":
-        verdict = "LIKELY TENANT-CHARGEABLE (worsened since move-in)" if worsened else "NO CHARGE — pre-existing at move-in"
+        # An item that already failed at move-in is the landlord's pre-existing condition to
+        # absorb, not the tenant's -- charging for it is not standard practice even if it looks
+        # worse at move-out. A worsened count is flagged for a human to look at (the incremental
+        # change might warrant a partial charge) but is never auto-marked chargeable.
+        verdict = "NEEDS HUMAN REVIEW (pre-existing at move-in, but appears to have worsened)" if worsened else "NO CHARGE — pre-existing at move-in"
     else:
         verdict = "NEEDS HUMAN REVIEW"
+
+    proration_note = None
+    if category and category["key"] == "paint_walls" and "CHARGEABLE" in verdict:
+        proration_note = (
+            "Paint charges are prorated, not full-cost -- judgment call based on (1) the extent "
+            "of damage shown in the photos (e.g. one wall vs. whole room) and (2) how much of "
+            "that is beyond normal wear and tear vs. ordinary fading/nail holes. No fixed "
+            "percentage table; a reviewer sets the % from the photos above. HUD's age-based "
+            "useful life (flat paint 3-5 yrs, enamel 5-7 yrs -- see HUD Citation) is a separate "
+            "ceiling on top of that: if the paint was already past its useful life, the charge "
+            "should be $0 regardless of damage extent."
+        )
 
     return {
         "category": category["label"] if category else "Uncategorized",
@@ -451,6 +467,7 @@ def classify_change(room, item, move_in, move_out, kb, kb_by_key):
         "az_citations": category["az_citations"] if category else ["A.R.S. § 33-1341(6)"],
         "hud_citation": category.get("hud_citation") if category else None,
         "useful_life_years": category.get("useful_life_years") if category else None,
+        "proration_note": proration_note,
     }
 
 
@@ -517,6 +534,8 @@ def render_report(property_label, results):
             f"| {r['room']} | {r['item']} | {move_in} | {move_out} "
             f"| {r['verdict']} | {r['category']} | {az} | {hud} |"
         )
+        if r.get("proration_note"):
+            lines.append(f"| | | | | _{r['proration_note']}_ | | | |")
     lines.append("")
     lines.append(f"_{len(results)} item(s) flagged as changed between move-in and move-out._")
     return "\n".join(lines)

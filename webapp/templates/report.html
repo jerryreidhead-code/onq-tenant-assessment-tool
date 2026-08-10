@@ -77,6 +77,7 @@
             <td>
               <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
               <div class="verdict-detail">{{ r.verdict }}</div>
+              {% if r.proration_note %}<div class="proration-note">{{ r.proration_note }}</div>{% endif %}
             </td>
             <td>{{ r.category }}</td>
             <td class="cell-citation">{{ r.az_citations | join('; ') }}</td>
