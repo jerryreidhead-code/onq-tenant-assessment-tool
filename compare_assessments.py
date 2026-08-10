@@ -19,6 +19,8 @@ Usage:
     python3 compare_assessments.py move_in.pdf move_out.pdf --dump-parsed   # debug parser
 """
 import argparse
+import base64
+import io
 import json
 import re
 import sys
@@ -76,6 +78,11 @@ class AssessmentItem:
     item: str
     condition: str
     notes: str = ""
+    images: list = None
+
+    def __post_init__(self):
+        if self.images is None:
+            self.images = []
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +99,7 @@ class AssessmentItem:
 
 _HEADER_RE = re.compile(r"^Pass\s+\d+,\s*Fail\s+\d+$")
 _PAGE_GAP = 100000  # large fixed offset per page so pages never interleave when merged
+_IMAGE_RESOLUTION = 100  # dpi for cropped item photos -- fast to render, plenty legible as a thumbnail
 
 
 def _extract_global_words(pdf):
@@ -106,66 +114,118 @@ def _extract_global_words(pdf):
     return words
 
 
+def _extract_global_images(pdf):
+    images = []
+    offset = 0
+    for page_index, page in enumerate(pdf.pages):
+        for img in page.images:
+            if img["x0"] >= 350:
+                continue  # only the notes/photo column, not the category or status columns
+            images.append({
+                "page_index": page_index,
+                "gtop": img["top"] + offset,
+                "bbox": (img["x0"], img["top"], img["x1"], img["bottom"]),
+            })
+        offset += _PAGE_GAP
+    return images
+
+
+def _render_field_images(pdf, images_by_field):
+    """images_by_field: {field_index: [image dict, ...]}. Renders each needed page once
+    and crops photos from it, returning {field_index: [data-uri, ...]}."""
+    needed_pages = {img["page_index"] for imgs in images_by_field.values() for img in imgs}
+    page_renders = {}
+    scale = _IMAGE_RESOLUTION / 72
+    for page_index in needed_pages:
+        page_renders[page_index] = pdf.pages[page_index].to_image(resolution=_IMAGE_RESOLUTION).original
+
+    result = {}
+    for field_index, imgs in images_by_field.items():
+        data_uris = []
+        for img in imgs:
+            page_img = page_renders[img["page_index"]]
+            x0, top, x1, bottom = img["bbox"]
+            box = (int(x0 * scale), int(top * scale), int(x1 * scale), int(bottom * scale))
+            if box[2] <= box[0] or box[3] <= box[1]:
+                continue
+            crop = page_img.crop(box)
+            buf = io.BytesIO()
+            crop.save(buf, format="PNG")
+            data_uris.append("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii"))
+        result[field_index] = data_uris
+    return result
+
+
 def parse_fastfield_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
         words = _extract_global_words(pdf)
+        all_images = _extract_global_images(pdf)
 
-    left = [w for w in words if w["x0"] < 350]
-    mid = [w for w in words if 350 <= w["x0"] < 500]
-    right = [w for w in words if w["x0"] >= 500]
+        left = [w for w in words if w["x0"] < 350]
+        mid = [w for w in words if 350 <= w["x0"] < 500]
+        right = [w for w in words if w["x0"] >= 500]
 
-    right_by_top = {}
-    for w in right:
-        right_by_top.setdefault(round(w["gtop"], 1), []).append(w)
+        right_by_top = {}
+        for w in right:
+            right_by_top.setdefault(round(w["gtop"], 1), []).append(w)
 
-    header_tops = set()
-    headers = {}
-    for top, ws in right_by_top.items():
-        joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"]))
-        if _HEADER_RE.match(joined):
-            header_tops.add(top)
-            name_words = [w["text"] for w in left if round(w["gtop"], 1) == top]
-            headers[top] = " ".join(name_words) if name_words else "(unnamed section)"
+        header_tops = set()
+        headers = {}
+        for top, ws in right_by_top.items():
+            joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"]))
+            if _HEADER_RE.match(joined):
+                header_tops.add(top)
+                name_words = [w["text"] for w in left if round(w["gtop"], 1) == top]
+                headers[top] = " ".join(name_words) if name_words else "(unnamed section)"
 
-    anchors = []
-    for top, ws in right_by_top.items():
-        if top in header_tops:
-            continue
-        joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"])).strip()
-        if joined.lower() in ("pass", "fail", "na"):
-            cat_words = sorted([w for w in mid if round(w["gtop"], 1) == top], key=lambda w: w["x0"])
-            category = " ".join(w["text"] for w in cat_words) if cat_words else "(unlabeled item)"
-            anchors.append({"top": top, "category": category, "status": joined.lower()})
-    anchors.sort(key=lambda a: a["top"])
+        anchors = []
+        for top, ws in right_by_top.items():
+            if top in header_tops:
+                continue
+            joined = " ".join(w["text"] for w in sorted(ws, key=lambda w: w["x0"])).strip()
+            if joined.lower() in ("pass", "fail", "na"):
+                cat_words = sorted([w for w in mid if round(w["gtop"], 1) == top], key=lambda w: w["x0"])
+                category = " ".join(w["text"] for w in cat_words) if cat_words else "(unlabeled item)"
+                anchors.append({"top": top, "category": category, "status": joined.lower()})
+        anchors.sort(key=lambda a: a["top"])
 
-    if not anchors:
-        return []  # not a FastField-layout PDF -- let the caller fall back
+        if not anchors:
+            return []  # not a FastField-layout PDF -- let the caller fall back
 
-    items = []
-    for idx, anchor in enumerate(anchors):
-        top = anchor["top"]
-        prev_top = anchors[idx - 1]["top"] if idx > 0 else -1e12
-        next_top = anchors[idx + 1]["top"] if idx < len(anchors) - 1 else 1e18
-        window_start = (prev_top + top) / 2
-        window_end = (top + next_top) / 2
-        notes_words = sorted(
-            (w for w in left if window_start < w["gtop"] <= window_end),
-            key=lambda w: (w["gtop"], w["x0"]),
-        )
-        notes = " ".join(w["text"] for w in notes_words).strip()
-        items.append({"top": top, "category": anchor["category"], "status": anchor["status"], "notes": notes})
+        items = []
+        images_by_field = {}
+        for idx, anchor in enumerate(anchors):
+            top = anchor["top"]
+            prev_top = anchors[idx - 1]["top"] if idx > 0 else -1e12
+            next_top = anchors[idx + 1]["top"] if idx < len(anchors) - 1 else 1e18
+            window_start = (prev_top + top) / 2
+            window_end = (top + next_top) / 2
+            notes_words = sorted(
+                (w for w in left if window_start < w["gtop"] <= window_end),
+                key=lambda w: (w["gtop"], w["x0"]),
+            )
+            notes = " ".join(w["text"] for w in notes_words).strip()
+            items.append({"top": top, "category": anchor["category"], "status": anchor["status"], "notes": notes})
+            images_by_field[idx] = [
+                img for img in all_images if window_start < img["gtop"] <= window_end
+            ]
 
-    header_list = sorted(headers.items())
-    result = []
-    for it in items:
-        room = "General"
-        for htop, hname in header_list:
-            if htop < it["top"]:
-                room = hname
-            else:
-                break
-        result.append(AssessmentItem(room=room, item=it["category"], condition=it["status"], notes=it["notes"]))
-    return result
+        field_images = _render_field_images(pdf, images_by_field)
+
+        header_list = sorted(headers.items())
+        result = []
+        for idx, it in enumerate(items):
+            room = "General"
+            for htop, hname in header_list:
+                if htop < it["top"]:
+                    room = hname
+                else:
+                    break
+            result.append(AssessmentItem(
+                room=room, item=it["category"], condition=it["status"], notes=it["notes"],
+                images=field_images.get(idx, []),
+            ))
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -272,7 +332,7 @@ def aggregate_items(items):
     groups = {}
     for it in items:
         key = normalize_key(it.room, it.item)
-        g = groups.setdefault(key, {"room": it.room, "item": it.item, "status": "na", "notes": [], "max_count": None})
+        g = groups.setdefault(key, {"room": it.room, "item": it.item, "status": "na", "notes": [], "max_count": None, "images": []})
         if _STATUS_RANK.get(it.condition, 0) > _STATUS_RANK.get(g["status"], 0):
             g["status"] = it.condition
         note = it.notes.strip()
@@ -282,6 +342,9 @@ def aggregate_items(items):
             n = int(m.group(1))
             if g["max_count"] is None or n > g["max_count"]:
                 g["max_count"] = n
+        for uri in it.images:
+            if uri not in g["images"]:
+                g["images"].append(uri)
     for g in groups.values():
         g["notes"] = "; ".join(g["notes"])
     return groups
@@ -411,7 +474,7 @@ def diff_assessments(move_in_items, move_out_items, kb):
     for key, out_g in move_out_groups.items():
         if is_excluded(out_g["item"], out_g["notes"]):
             continue
-        in_g = move_in_groups.get(key, {"status": "na", "notes": "(not present at move-in)", "max_count": None})
+        in_g = move_in_groups.get(key, {"status": "na", "notes": "(not present at move-in)", "max_count": None, "images": []})
 
         no_status_change = in_g["status"] == out_g["status"]
         no_notes_change = in_g["notes"].strip().lower() == out_g["notes"].strip().lower()
@@ -424,8 +487,10 @@ def diff_assessments(move_in_items, move_out_items, kb):
             "item": out_g["item"],
             "move_in_condition": in_g["status"],
             "move_in_notes": in_g["notes"],
+            "move_in_images": in_g["images"],
             "move_out_condition": out_g["status"],
             "move_out_notes": out_g["notes"],
+            "move_out_images": out_g["images"],
             **classification,
         })
     return results
@@ -471,9 +536,13 @@ def main():
     move_out_items = parse_assessment(args.move_out_pdf)
 
     if args.dump_parsed:
+        def _summarize(i):
+            d = dict(vars(i))
+            d["images"] = f"{len(d['images'])} image(s)"
+            return d
         print(json.dumps({
-            "move_in": [vars(i) for i in move_in_items],
-            "move_out": [vars(i) for i in move_out_items],
+            "move_in": [_summarize(i) for i in move_in_items],
+            "move_out": [_summarize(i) for i in move_out_items],
         }, indent=2))
         return
 

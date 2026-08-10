@@ -7,6 +7,17 @@
   {%- endif -%}
 {%- endmacro %}
 
+{% macro photo_strip(images) %}
+  {% if images %}
+  <div class="photo-strip">
+    {% for src in images[:4] %}
+    <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" class="thumb" alt="Assessment photo"></a>
+    {% endfor %}
+    {% if images | length > 4 %}<span class="thumb-more">+{{ images | length - 4 }}</span>{% endif %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="disposition-shell">
   <nav class="filter-sidebar" id="filter-sidebar">
@@ -61,8 +72,8 @@
           <tr data-verdict-group="{{ r.verdict_group }}">
             <td>{{ r.room }}</td>
             <td class="cell-item">{{ r.item }}</td>
-            <td>{{ r.move_in_condition }}</td>
-            <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}</td>
+            <td>{{ r.move_in_condition }}{{ photo_strip(r.move_in_images) }}</td>
+            <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}{{ photo_strip(r.move_out_images) }}</td>
             <td>
               <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
               <div class="verdict-detail">{{ r.verdict }}</div>
