@@ -36,6 +36,22 @@
   </form>
   <p class="note">Uploaded PDFs are processed in memory and are not stored on the server.</p>
 </div>
+
+{% if recent_reports %}
+<div class="card history-card">
+  <h2 class="section-heading" style="margin-top:0;">Recent analyses</h2>
+  <input type="text" id="history-search" placeholder="Search by property address…" autocomplete="off">
+  <div id="history-list">
+    {% for r in recent_reports %}
+    <a class="history-row" href="{{ url_for('view_report', report_id=r.report_id) }}" data-label="{{ r.property_label | lower }}">
+      <span class="history-label">{{ r.property_label }}</span>
+      <span class="history-time">{{ r.timestamp }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  <p class="note" id="history-empty" hidden>No matching analyses.</p>
+</div>
+{% endif %}
 </div>
 
 <script>
@@ -77,5 +93,21 @@ document.getElementById('compare-form').addEventListener('submit', function () {
   btn.querySelector('.btn-label').textContent = 'Comparing…';
   btn.classList.add('is-loading');
 });
+
+var historySearch = document.getElementById('history-search');
+if (historySearch) {
+  var historyRows = document.querySelectorAll('.history-row');
+  var historyEmpty = document.getElementById('history-empty');
+  historySearch.addEventListener('input', function () {
+    var q = historySearch.value.trim().toLowerCase();
+    var visible = 0;
+    historyRows.forEach(function (row) {
+      var show = !q || row.dataset.label.indexOf(q) !== -1;
+      row.hidden = !show;
+      if (show) visible++;
+    });
+    historyEmpty.hidden = visible !== 0;
+  });
+}
 </script>
 {% endblock %}

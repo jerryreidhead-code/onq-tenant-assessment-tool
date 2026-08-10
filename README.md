@@ -82,6 +82,13 @@ prorated charge amount instead of the full replacement cost.
 functions — upload two PDFs in a browser, get the same report rendered as an HTML table
 instead of markdown. Uploaded PDFs are parsed in memory and never written to disk.
 
+**Recent-analyses search:** the last `MAX_CACHED_REPORTS` (8) comparisons are kept in an
+in-memory cache (`REPORT_CACHE` in `app.py`) so a property can be searched up again from
+the home page without re-uploading PDFs. This is deliberately in-memory only, not a real
+database — restarting the server clears it, consistent with the tool's "nothing is stored"
+posture. If this needs to survive restarts later, that's a real scope change (encryption at
+rest, access control, retention/deletion policy), not a quick add.
+
 Run it locally:
 
 ```bash

@@ -15,6 +15,7 @@ import secrets
 import sys
 import uuid
 from collections import OrderedDict
+from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
@@ -28,11 +29,14 @@ app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 APP_PASSWORD = os.environ.get("APP_PASSWORD")  # set this before deploying anywhere reachable
 
-# In-memory store of per-report photo bytes, keyed by report_id, so the report page can
-# reference small /photo/... URLs and let the browser lazy-load them instead of embedding
-# every image inline. Bounded so a long-running dev server doesn't grow unbounded; photos
-# are never written to disk, consistent with the in-memory-only handling of the PDFs.
-PHOTO_CACHE = OrderedDict()
+# In-memory store of past reports (full results + photo bytes), keyed by report_id, so a
+# property can be searched up again without re-uploading PDFs, and so the report page can
+# reference small /photo/... URLs instead of embedding every image inline. Bounded so a
+# long-running dev server doesn't grow unbounded; nothing here is ever written to disk --
+# it's gone on restart, consistent with the tool's in-memory-only handling of tenant PDFs
+# and photos. If this ever needs to survive restarts, that's a deliberate follow-up (real
+# storage needs encryption-at-rest / access-control / retention thought, not a quick add).
+REPORT_CACHE = OrderedDict()
 MAX_CACHED_REPORTS = 8
 
 
@@ -40,7 +44,7 @@ def _data_uri_to_bytes(data_uri):
     return base64.b64decode(data_uri.split(",", 1)[1])
 
 
-def _store_photos_and_replace_with_urls(report_id, results):
+def _store_report(report_id, property_label, results, total_count, summary, warnings):
     photo_store = []
     for row_index, r in enumerate(results):
         row_photos = {"move_in": [], "move_out": []}
@@ -56,9 +60,29 @@ def _store_photos_and_replace_with_urls(report_id, results):
         r["move_in_images"] = move_in_urls
         r["move_out_images"] = move_out_urls
 
-    PHOTO_CACHE[report_id] = photo_store
-    while len(PHOTO_CACHE) > MAX_CACHED_REPORTS:
-        PHOTO_CACHE.popitem(last=False)
+    REPORT_CACHE[report_id] = {
+        "photos": photo_store,
+        "property_label": property_label,
+        "timestamp": datetime.now(),
+        "results": results,
+        "total_count": total_count,
+        "summary": summary,
+        "warnings": warnings,
+    }
+    while len(REPORT_CACHE) > MAX_CACHED_REPORTS:
+        REPORT_CACHE.popitem(last=False)
+
+
+def _recent_reports():
+    """Most-recent-first list of {report_id, property_label, timestamp} for the history search."""
+    return [
+        {
+            "report_id": rid,
+            "property_label": entry["property_label"],
+            "timestamp": entry["timestamp"].strftime("%b %-d, %-I:%M %p"),
+        }
+        for rid, entry in reversed(REPORT_CACHE.items())
+    ]
 
 
 def login_required(view):
@@ -91,7 +115,7 @@ def logout():
 @app.route("/", methods=["GET"])
 @login_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", recent_reports=_recent_reports())
 
 
 @app.route("/compare", methods=["POST"])
@@ -126,15 +150,33 @@ def compare():
     }
 
     report_id = uuid.uuid4().hex
-    _store_photos_and_replace_with_urls(report_id, results)
+    total_count = len(results)
+    _store_report(report_id, property_label, results, total_count, summary, warnings)
 
     return render_template(
         "report.html",
         property_label=property_label,
         results=results,
-        total_count=len(results),
+        total_count=total_count,
         warnings=warnings,
         summary=summary,
+    )
+
+
+@app.route("/report/<report_id>")
+@login_required
+def view_report(report_id):
+    entry = REPORT_CACHE.get(report_id)
+    if entry is None:
+        flash("That report is no longer available (only the most recent reports are kept in memory).")
+        return redirect(url_for("index"))
+    return render_template(
+        "report.html",
+        property_label=entry["property_label"],
+        results=entry["results"],
+        total_count=entry["total_count"],
+        warnings=entry["warnings"],
+        summary=entry["summary"],
     )
 
 
@@ -142,10 +184,11 @@ def compare():
 @login_required
 def serve_photo(report_id, row, side, idx):
     key = "move_in" if side == "in" else "move_out" if side == "out" else None
-    entry = PHOTO_CACHE.get(report_id)
-    if key is None or entry is None or row >= len(entry) or idx >= len(entry[row][key]):
+    entry = REPORT_CACHE.get(report_id)
+    photos = entry["photos"] if entry else None
+    if key is None or photos is None or row >= len(photos) or idx >= len(photos[row][key]):
         abort(404)
-    return Response(entry[row][key][idx], mimetype="image/png")
+    return Response(photos[row][key][idx], mimetype="image/png")
 
 
 def _parse_uploaded(file_storage):
