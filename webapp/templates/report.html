@@ -76,6 +76,7 @@
             <td>{{ r.move_out_condition }}{% if r.move_out_notes %}<span class="cell-notes"> &mdash; {{ r.move_out_notes }}</span>{% endif %}{{ photo_strip(r.move_out_images) }}</td>
             <td>
               <span class="badge {{ badge[0] }}">{{ badge[1] }}</span>
+              {% if r.suggested_percentage %}<span class="suggested-pct">~{{ r.suggested_percentage }}%</span>{% endif %}
               <div class="verdict-detail">{{ r.verdict }}</div>
               {% if r.proration_note %}<div class="proration-note">{{ r.proration_note }}</div>{% endif %}
             </td>

@@ -390,6 +390,16 @@ tbody tr:last-child td { border-bottom: none; }
 .badge-wear { background: var(--wear-strong); }
 .badge-review { background: var(--review-strong); }
 .verdict-detail { font-size: 0.72rem; color: var(--muted); margin-top: 4px; white-space: normal; max-width: 220px; }
+.suggested-pct {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--review-strong);
+  background: var(--review);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
 .proration-note {
   font-size: 0.72rem;
   color: var(--text);
