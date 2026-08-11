@@ -421,6 +421,13 @@ APPLIANCE_ROOMS = {
     "water heater", "garbage disposal", "other appliance 1", "other appliance 2",
 }
 
+# Categories where the charge is customarily a proration (% of repair/replacement cost)
+# rather than a flat amount -- extent of damage plus a HUD age-based useful-life ceiling.
+PRORATED_CATEGORIES = {
+    "paint_walls": "repaint",
+    "carpet_flooring": "repair/replacement",
+}
+
 
 WINDOW_COVERING_WORDS = ["window covering", "blind", "slat", "shade", "curtain"]
 
@@ -480,24 +487,25 @@ def classify_change(room, item, move_in, move_out, kb, kb_by_key):
 
     proration_note = None
     suggested_percentage = None
-    if category and category["key"] == "paint_walls" and "CHARGEABLE" in verdict:
-        suggested_percentage = _suggest_paint_percentage(out_count)
+    if category and category["key"] in PRORATED_CATEGORIES and "CHARGEABLE" in verdict:
+        cost_label = PRORATED_CATEGORIES[category["key"]]
+        life_text = _format_useful_life(category.get("useful_life_years"))
+        suggested_percentage = _suggest_damage_percentage(out_count)
         if suggested_percentage is not None:
             proration_note = (
-                f"Suggested starting point: ~{suggested_percentage}% of repaint cost, based on "
-                f"{out_count} paint issue(s) noted at move-out. This is a heuristic (issue count -> "
-                "tier), not a company-established table -- adjust from the photos above for actual "
-                "coverage and how much is beyond normal wear and tear. HUD's age-based useful life "
-                "(flat paint 3-5 yrs, enamel 5-7 yrs -- see HUD Citation) is a separate ceiling: if "
-                "the paint was already past its useful life, the charge should be $0 regardless."
+                f"Suggested starting point: ~{suggested_percentage}% of {cost_label} cost, based on "
+                f"{out_count} issue(s) noted at move-out. This is a heuristic (issue count -> tier), "
+                "not a company-established table -- adjust from the photos above for actual coverage "
+                f"and how much is beyond normal wear and tear. HUD's age-based useful life ({life_text} "
+                "-- see HUD Citation) is a separate ceiling: if the item was already past its useful "
+                "life, the charge should be $0 regardless."
             )
         else:
             proration_note = (
                 "No issue count found to base a percentage on -- judgment call from the photos "
-                "above: (1) extent of damage (one wall vs. whole room) and (2) how much is beyond "
-                "normal wear and tear. HUD's age-based useful life (flat paint 3-5 yrs, enamel 5-7 "
-                "yrs) is a separate ceiling: if the paint was already past its useful life, the "
-                "charge should be $0 regardless of damage extent."
+                "above: (1) extent of damage and (2) how much is beyond normal wear and tear. "
+                f"HUD's age-based useful life ({life_text}) is a separate ceiling: if the item was "
+                "already past its useful life, the charge should be $0 regardless of damage extent."
             )
 
     return {
@@ -511,7 +519,13 @@ def classify_change(room, item, move_in, move_out, kb, kb_by_key):
     }
 
 
-def _suggest_paint_percentage(issue_count):
+def _format_useful_life(useful_life_years):
+    if not useful_life_years:
+        return "no HUD figure on record"
+    return ", ".join(f"{k.replace('_', ' ')}: {v} yrs" for k, v in useful_life_years.items())
+
+
+def _suggest_damage_percentage(issue_count):
     """Rough issue-count -> charge-percentage tiers. This is a heuristic starting point invented
     for this tool (On Q has no fixed table), not an authoritative or company-established scale --
     always show it alongside the photos so a reviewer can override it."""
