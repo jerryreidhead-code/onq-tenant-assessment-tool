@@ -10,4 +10,4 @@ COPY . .
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
-CMD gunicorn -b 0.0.0.0:${PORT:-8000} --workers 2 --timeout 60 webapp.app:app
+CMD gunicorn -b 0.0.0.0:${PORT:-8000} --workers 1 --timeout 60 webapp.app:app

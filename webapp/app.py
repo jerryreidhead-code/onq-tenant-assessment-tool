@@ -36,6 +36,12 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")  # set this before deploying anywh
 # it's gone on restart, consistent with the tool's in-memory-only handling of tenant PDFs
 # and photos. If this ever needs to survive restarts, that's a deliberate follow-up (real
 # storage needs encryption-at-rest / access-control / retention thought, not a quick add).
+#
+# IMPORTANT: this is a plain process-local dict, not shared across processes. The Dockerfile
+# MUST run gunicorn with a single worker (--workers 1) -- with 2+ workers, each has its own
+# copy of this dict, so a /photo/... request can land on a worker that never saw the /compare
+# request that populated it, producing intermittent broken images. If this tool ever needs
+# more concurrency, move this to a shared store (Redis, SQLite, etc.) rather than adding workers.
 REPORT_CACHE = OrderedDict()
 MAX_CACHED_REPORTS = 8
 
