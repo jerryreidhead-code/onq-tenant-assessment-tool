@@ -132,19 +132,23 @@ def _extract_global_images(pdf):
 
 
 def _render_field_images(pdf, images_by_field):
-    """images_by_field: {field_index: [image dict, ...]}. Renders each needed page once
-    and crops photos from it, returning {field_index: [data-uri, ...]}."""
-    needed_pages = {img["page_index"] for imgs in images_by_field.values() for img in imgs}
-    page_renders = {}
+    """images_by_field: {field_index: [image dict, ...]}. Renders each needed page exactly
+    once, crops all of that page's photos immediately, then discards the full-page render
+    before moving to the next page -- keeps peak memory to roughly one rendered page
+    regardless of how many pages have photos. Important on memory-constrained hosts: at
+    _IMAGE_RESOLUTION dpi a single full-page render is tens of MB, and holding a dozen-plus
+    of them simultaneously (the previous approach) was enough to exceed a 512MB instance."""
     scale = _IMAGE_RESOLUTION / 72
-    for page_index in needed_pages:
-        page_renders[page_index] = pdf.pages[page_index].to_image(resolution=_IMAGE_RESOLUTION).original
 
-    result = {}
+    entries_by_page = {}
     for field_index, imgs in images_by_field.items():
-        data_uris = []
         for img in imgs:
-            page_img = page_renders[img["page_index"]]
+            entries_by_page.setdefault(img["page_index"], []).append((field_index, img))
+
+    result = {field_index: [] for field_index in images_by_field}
+    for page_index, entries in entries_by_page.items():
+        page_img = pdf.pages[page_index].to_image(resolution=_IMAGE_RESOLUTION).original
+        for field_index, img in entries:
             x0, top, x1, bottom = img["bbox"]
             box = (int(x0 * scale), int(top * scale), int(x1 * scale), int(bottom * scale))
             if box[2] <= box[0] or box[3] <= box[1]:
@@ -152,8 +156,8 @@ def _render_field_images(pdf, images_by_field):
             crop = page_img.crop(box)
             buf = io.BytesIO()
             crop.save(buf, format="PNG")
-            data_uris.append("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii"))
-        result[field_index] = data_uris
+            result[field_index].append("data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii"))
+        del page_img
     return result
 
 
