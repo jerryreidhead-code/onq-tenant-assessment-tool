@@ -19,6 +19,7 @@ from datetime import datetime
 from functools import wraps
 from pathlib import Path
 
+import anthropic
 from flask import Flask, Response, abort, jsonify, render_template, request, session, redirect, url_for, flash
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,6 +29,11 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 APP_PASSWORD = os.environ.get("APP_PASSWORD")  # set this before deploying anywhere reachable
+
+# Matterport walkthrough review needs Claude's vision to spot damage in photos -- optional,
+# since a comparison should still work with just the two PDFs if this isn't configured.
+_ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+ANTHROPIC_CLIENT = anthropic.Anthropic(api_key=_ANTHROPIC_API_KEY) if _ANTHROPIC_API_KEY else None
 
 # In-memory store of past reports (full results + photo bytes), keyed by report_id, so a
 # property can be searched up again without re-uploading PDFs, and so the report page can
@@ -50,7 +56,7 @@ def _data_uri_to_bytes(data_uri):
     return base64.b64decode(data_uri.split(",", 1)[1])
 
 
-def _store_report(report_id, property_label, results, total_count, summary, warnings):
+def _store_report(report_id, property_label, results, total_count, summary, warnings, matterport_rooms):
     photo_store = []
     for row_index, r in enumerate(results):
         row_photos = {"move_in": [], "move_out": []}
@@ -74,6 +80,11 @@ def _store_report(report_id, property_label, results, total_count, summary, warn
         "total_count": total_count,
         "summary": summary,
         "warnings": warnings,
+        # Matterport images are left pointing at Matterport's own CDN (signed URLs, good for
+        # ~24h) rather than proxied through our /photo/ cache -- keeps this feature from adding
+        # any server-side image-serving load, at the cost of those thumbnails eventually
+        # breaking on very old cached reports, consistent with this tool's ephemeral history.
+        "matterport_rooms": matterport_rooms,
     }
     while len(REPORT_CACHE) > MAX_CACHED_REPORTS:
         REPORT_CACHE.popitem(last=False)
@@ -146,6 +157,8 @@ def compare():
     move_in_file = request.files.get("move_in_pdf")
     move_out_file = request.files.get("move_out_pdf")
     property_label = request.form.get("property")
+    move_in_matterport_url = request.form.get("move_in_matterport_url", "").strip()
+    move_out_matterport_url = request.form.get("move_out_matterport_url", "").strip()
 
     if not move_in_file or not move_out_file:
         flash("Please upload both a move-in and a move-out assessment PDF.")
@@ -180,9 +193,23 @@ def compare():
         "review": sum(1 for r in results if r["verdict_group"] == "review"),
     }
 
+    matterport_rooms = []
+    if move_in_matterport_url or move_out_matterport_url:
+        if not ANTHROPIC_CLIENT:
+            warnings.append(
+                "Matterport walkthrough review was skipped -- ANTHROPIC_API_KEY isn't configured on the server."
+            )
+        else:
+            try:
+                matterport_rooms = ca.build_matterport_review(
+                    move_in_matterport_url, move_out_matterport_url, results, ANTHROPIC_CLIENT
+                )
+            except Exception as exc:
+                warnings.append(f"Matterport walkthrough review failed: {exc}")
+
     report_id = uuid.uuid4().hex
     total_count = len(results)
-    _store_report(report_id, property_label, results, total_count, summary, warnings)
+    _store_report(report_id, property_label, results, total_count, summary, warnings, matterport_rooms)
 
     return render_template(
         "report.html",
@@ -191,6 +218,7 @@ def compare():
         total_count=total_count,
         warnings=warnings,
         summary=summary,
+        matterport_rooms=matterport_rooms,
     )
 
 
@@ -208,6 +236,7 @@ def view_report(report_id):
         total_count=entry["total_count"],
         warnings=entry["warnings"],
         summary=entry["summary"],
+        matterport_rooms=entry.get("matterport_rooms", []),
     )
 
 

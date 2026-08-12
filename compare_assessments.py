@@ -24,10 +24,12 @@ import io
 import json
 import re
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
 import pdfplumber
+import requests
 
 REFERENCE_DIR = Path(__file__).parent / "reference"
 KB_PATH = REFERENCE_DIR / "knowledge_base.json"
@@ -616,6 +618,162 @@ def render_report(property_label, results):
     lines.append("")
     lines.append(f"_{len(results)} item(s) flagged as changed between move-in and move-out._")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Matterport walkthrough cross-check -- pulls the tagged room photos from a
+# Matterport share link's public snapshot API (no login needed; it's the same
+# call the Matterport viewer itself makes for its own "Photos" panel), uses
+# Claude's vision to flag possible damage per room, then checks whether that
+# room already has a corresponding line item in the written comparison.
+# ---------------------------------------------------------------------------
+
+_MATTERPORT_MODEL_ID_RE = re.compile(r"[?&]m=([A-Za-z0-9]+)")
+# Persisted-query hash for the GetSnapshots operation, captured from the Matterport
+# viewer's own network traffic. Persisted queries are just cache keys for a fixed query
+# string server-side -- there's nothing account-specific in the hash itself, but Matterport
+# could change/retire it in a future viewer release, in which case this call starts 404ing
+# and fetch_matterport_photos() should be revisited against a fresh capture.
+_MATTERPORT_SNAPSHOTS_HASH = "6cc214b557ce3a722b973e119b784c245cae184fc099db44c17ccf3704aeeea2"
+_MATTERPORT_EXCLUDED_LABELS = {"dollhouse view", "floor plan", "feature highlight", "unspecified"}
+
+
+def extract_matterport_model_id(share_url):
+    m = _MATTERPORT_MODEL_ID_RE.search(share_url or "")
+    return m.group(1) if m else None
+
+
+def canonical_room_key(room_name):
+    """Map a freeform room string down to one of ROOM_KEYWORDS so a written report's
+    room names ('Bedroom 2', 'Primary Bedroom') and Matterport's generic photo labels
+    ('Bedroom') can be compared on the same vocabulary."""
+    lower = (room_name or "").strip().lower()
+    for kw in ROOM_KEYWORDS:
+        if kw in lower:
+            return kw
+    return lower
+
+
+def fetch_matterport_photos(share_url):
+    """Return [{"label", "room_key", "image_url"}, ...] for a Matterport share link's
+    tagged room photos. Raises requests.RequestException on network failure -- callers
+    should catch that and degrade to a warning rather than failing the whole comparison."""
+    model_id = extract_matterport_model_id(share_url)
+    if not model_id:
+        return []
+    variables = json.dumps({"modelId": model_id}, separators=(",", ":"))
+    extensions = json.dumps(
+        {"persistedQuery": {"version": 1, "sha256Hash": _MATTERPORT_SNAPSHOTS_HASH}}, separators=(",", ":")
+    )
+    resp = requests.get(
+        "https://my.matterport.com/api/mp/models/graph",
+        params={"operationName": "GetSnapshots", "variables": variables, "extensions": extensions},
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    photos = resp.json().get("data", {}).get("model", {}).get("assets", {}).get("photos", [])
+
+    out = []
+    for p in photos:
+        label = (p.get("label") or "").strip()
+        image_url = p.get("presentationUrl") or p.get("url")
+        if not label or not image_url or label.lower() in _MATTERPORT_EXCLUDED_LABELS:
+            continue
+        out.append({"label": label, "room_key": canonical_room_key(label), "image_url": image_url})
+    return out
+
+
+_DAMAGE_PROMPT = """You are helping a property manager review a move-out photo from a Matterport \
+3D walkthrough of a rental unit. Look at the photo and list any visible signs of property damage \
+that would plausibly go beyond normal wear and tear -- e.g. holes, large stains, cracks, water \
+damage, broken or missing fixtures, burns, significant scuffs or gouges. Ignore normal wear, minor \
+dust, staging furniture/decor, or lighting artifacts. If nothing notable is visible, say so.
+
+Respond with ONLY a JSON object, no other text: {"damage_found": true or false, "notes": ["short description", ...]}"""
+
+_MATTERPORT_VISION_MODEL = "claude-sonnet-5"
+
+
+def analyze_matterport_photo(client, image_url, room_label):
+    """Downloads one Matterport photo and asks Claude's vision to flag possible damage.
+    Returns {"damage_found": bool, "notes": [...]}; degrades to no-damage-found on any
+    download or parsing failure so one bad photo doesn't break the whole review."""
+    try:
+        img_resp = requests.get(image_url, timeout=20)
+        img_resp.raise_for_status()
+        image_b64 = base64.b64encode(img_resp.content).decode("ascii")
+        media_type = img_resp.headers.get("Content-Type", "image/jpeg").split(";")[0]
+
+        resp = client.messages.create(
+            model=_MATTERPORT_VISION_MODEL,
+            max_tokens=400,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
+                    {"type": "text", "text": f"Room: {room_label}\n\n{_DAMAGE_PROMPT}"},
+                ],
+            }],
+        )
+        text = "".join(block.text for block in resp.content if block.type == "text")
+        data = json.loads(text)
+        return {"damage_found": bool(data.get("damage_found")), "notes": list(data.get("notes") or [])}
+    except Exception as exc:
+        return {"damage_found": False, "notes": [], "error": str(exc)}
+
+
+def build_matterport_review(move_in_url, move_out_url, comparison_results, client):
+    """Fetches move-in and move-out Matterport photos, runs move-out photos through
+    vision-based damage detection (concurrently -- these are I/O-bound API calls, not
+    CPU-bound like PDF rendering, so threading them doesn't fight the host's CPU budget),
+    and cross-checks each finding against whether the written report already covers that
+    room. Returns a list of per-room dicts for the report template, or [] if neither URL
+    was provided."""
+    move_in_photos = fetch_matterport_photos(move_in_url) if move_in_url else []
+    move_out_photos = fetch_matterport_photos(move_out_url) if move_out_url else []
+    if not move_in_photos and not move_out_photos:
+        return []
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        analyses = list(pool.map(
+            lambda p: {**p, **analyze_matterport_photo(client, p["image_url"], p["label"])},
+            move_out_photos,
+        ))
+
+    rooms_with_report_findings = {canonical_room_key(r["room"]) for r in comparison_results}
+    move_in_by_room = {}
+    for p in move_in_photos:
+        move_in_by_room.setdefault(p["room_key"], []).append(p)
+
+    rooms = []
+    seen = set()
+    for a in analyses:
+        if a["room_key"] in seen:
+            continue
+        seen.add(a["room_key"])
+        room_move_out = [x for x in analyses if x["room_key"] == a["room_key"]]
+        rooms.append({
+            "room_key": a["room_key"],
+            "label": a["label"],
+            "move_in_photos": move_in_by_room.get(a["room_key"], []),
+            "move_out_photos": room_move_out,
+            "any_damage_found": any(x["damage_found"] for x in room_move_out),
+            "covered_by_report": a["room_key"] in rooms_with_report_findings,
+        })
+    # rooms with move-in photos but no move-out photos at all (e.g. inaccessible room at
+    # move-out) still deserve a row so a reviewer notices the gap
+    for room_key, photos in move_in_by_room.items():
+        if room_key not in seen:
+            rooms.append({
+                "room_key": room_key,
+                "label": photos[0]["label"],
+                "move_in_photos": photos,
+                "move_out_photos": [],
+                "any_damage_found": False,
+                "covered_by_report": room_key in rooms_with_report_findings,
+            })
+    return rooms
 
 
 def main():
