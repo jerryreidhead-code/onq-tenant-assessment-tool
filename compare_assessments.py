@@ -99,8 +99,11 @@ class AssessmentItem:
 
 _HEADER_RE = re.compile(r"^Pass\s+\d+,\s*Fail\s+\d+$")
 _PAGE_GAP = 100000  # large fixed offset per page so pages never interleave when merged
-_IMAGE_RESOLUTION = 300  # dpi for cropped item photos -- thumbnails are downscaled by CSS anyway,
-# this only affects how usable the full-size view is when a reviewer clicks a photo
+_IMAGE_RESOLUTION = 200  # dpi for cropped item photos -- thumbnails are downscaled by CSS anyway,
+# this only affects how usable the full-size view is when a reviewer clicks a photo.
+# Deliberately not higher: the deployed host's free tier caps CPU at 0.15 vCPU, and PDF page
+# rendering is CPU-bound -- 300dpi (9x the pixels of 100dpi, vs 4x here) was slow enough there
+# to make requests hang rather than finish. A paid instance type would remove this ceiling.
 
 
 def _extract_global_words(pdf):
