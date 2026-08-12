@@ -99,7 +99,8 @@ class AssessmentItem:
 
 _HEADER_RE = re.compile(r"^Pass\s+\d+,\s*Fail\s+\d+$")
 _PAGE_GAP = 100000  # large fixed offset per page so pages never interleave when merged
-_IMAGE_RESOLUTION = 100  # dpi for cropped item photos -- fast to render, plenty legible as a thumbnail
+_IMAGE_RESOLUTION = 300  # dpi for cropped item photos -- thumbnails are downscaled by CSS anyway,
+# this only affects how usable the full-size view is when a reviewer clicks a photo
 
 
 def _extract_global_words(pdf):
