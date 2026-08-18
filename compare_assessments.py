@@ -723,56 +723,104 @@ def analyze_matterport_photo(client, image_url, room_label):
         return {"damage_found": False, "notes": [], "error": str(exc)}
 
 
+_NEW_DAMAGE_FILTER_PROMPT = """You are helping a property manager figure out which move-out damage \
+in a rental unit is NEW versus already present at move-in -- damage that was already there at move-in \
+cannot be charged to the tenant. Below are damage notes from photos of the same room at move-in and at \
+move-out (both from a Matterport 3D walkthrough).
+
+Move-in notes:
+{move_in_notes}
+
+Move-out notes:
+{move_out_notes}
+
+Return ONLY a JSON object, no other text, listing just the move-out notes that describe damage NOT \
+already covered by a move-in note (same or similar issue, same rough location = already covered, even if \
+the wording differs or it looks slightly worse now):
+{{"new_notes": ["short description", ...]}}"""
+
+
+def filter_new_damage(client, move_in_notes, move_out_notes):
+    """Text-only comparison (no images -- cheap, fast) that separates move-out damage that's
+    genuinely new from damage that was already visible at move-in and so isn't chargeable.
+    Degrades to treating everything as new if the comparison call fails, since that's the
+    safer default for a human reviewer to double-check."""
+    try:
+        resp = client.messages.create(
+            model=_MATTERPORT_VISION_MODEL,
+            max_tokens=400,
+            messages=[{
+                "role": "user",
+                "content": _NEW_DAMAGE_FILTER_PROMPT.format(
+                    move_in_notes="\n".join(f"- {n}" for n in move_in_notes),
+                    move_out_notes="\n".join(f"- {n}" for n in move_out_notes),
+                ),
+            }],
+        )
+        text = "".join(block.text for block in resp.content if block.type == "text")
+        return list(json.loads(text).get("new_notes") or [])
+    except Exception:
+        return list(move_out_notes)
+
+
 def build_matterport_review(move_in_url, move_out_url, comparison_results, client):
-    """Fetches move-in and move-out Matterport photos, runs move-out photos through
-    vision-based damage detection (concurrently -- these are I/O-bound API calls, not
-    CPU-bound like PDF rendering, so threading them doesn't fight the host's CPU budget),
-    and cross-checks each finding against whether the written report already covers that
-    room. Returns a list of per-room dicts for the report template, or [] if neither URL
-    was provided."""
+    """Fetches move-in and move-out Matterport photos and runs BOTH sides through vision-based
+    damage detection (concurrently -- these are I/O-bound API calls, not CPU-bound like PDF
+    rendering, so threading them doesn't fight the host's CPU budget). Move-out damage is then
+    filtered against the move-in baseline for that room, so damage that was already present at
+    move-in isn't flagged as newly missed -- mirroring the same fail-at-move-in-isn't-chargeable
+    rule the written-report classifier already follows. Surviving new damage is cross-checked
+    against whether the written report covers that room. Returns a list of per-room dicts for
+    the report template, or [] if neither URL was provided."""
     move_in_photos = fetch_matterport_photos(move_in_url) if move_in_url else []
     move_out_photos = fetch_matterport_photos(move_out_url) if move_out_url else []
     if not move_in_photos and not move_out_photos:
         return []
 
     with ThreadPoolExecutor(max_workers=6) as pool:
-        analyses = list(pool.map(
+        all_photos = move_in_photos + move_out_photos
+        analyzed = list(pool.map(
             lambda p: {**p, **analyze_matterport_photo(client, p["image_url"], p["label"])},
-            move_out_photos,
+            all_photos,
         ))
+    move_in_analyses = analyzed[:len(move_in_photos)]
+    move_out_analyses = analyzed[len(move_in_photos):]
+
+    move_in_by_room, move_out_by_room = {}, {}
+    for a in move_in_analyses:
+        move_in_by_room.setdefault(a["room_key"], []).append(a)
+    for a in move_out_analyses:
+        move_out_by_room.setdefault(a["room_key"], []).append(a)
 
     rooms_with_report_findings = {canonical_room_key(r["room"]) for r in comparison_results}
-    move_in_by_room = {}
-    for p in move_in_photos:
-        move_in_by_room.setdefault(p["room_key"], []).append(p)
 
     rooms = []
-    seen = set()
-    for a in analyses:
-        if a["room_key"] in seen:
-            continue
-        seen.add(a["room_key"])
-        room_move_out = [x for x in analyses if x["room_key"] == a["room_key"]]
+    for room_key in sorted(set(move_in_by_room) | set(move_out_by_room)):
+        in_photos = move_in_by_room.get(room_key, [])
+        out_photos = move_out_by_room.get(room_key, [])
+        label = (out_photos or in_photos)[0]["label"]
+
+        move_in_notes = [n for p in in_photos for n in p["notes"]]
+        move_out_notes = [n for p in out_photos for n in p["notes"]]
+
+        if not move_out_notes:
+            new_damage_notes = []
+        elif not move_in_notes:
+            new_damage_notes = move_out_notes  # no move-in baseline -- all of it is "new"
+        else:
+            new_damage_notes = filter_new_damage(client, move_in_notes, move_out_notes)
+
         rooms.append({
-            "room_key": a["room_key"],
-            "label": a["label"],
-            "move_in_photos": move_in_by_room.get(a["room_key"], []),
-            "move_out_photos": room_move_out,
-            "any_damage_found": any(x["damage_found"] for x in room_move_out),
-            "covered_by_report": a["room_key"] in rooms_with_report_findings,
+            "room_key": room_key,
+            "label": label,
+            "move_in_photos": in_photos,
+            "move_out_photos": out_photos,
+            "move_in_damage_notes": move_in_notes,
+            "new_damage_notes": new_damage_notes,
+            "pre_existing_damage_only": bool(move_out_notes) and not new_damage_notes,
+            "any_new_damage": bool(new_damage_notes),
+            "covered_by_report": room_key in rooms_with_report_findings,
         })
-    # rooms with move-in photos but no move-out photos at all (e.g. inaccessible room at
-    # move-out) still deserve a row so a reviewer notices the gap
-    for room_key, photos in move_in_by_room.items():
-        if room_key not in seen:
-            rooms.append({
-                "room_key": room_key,
-                "label": photos[0]["label"],
-                "move_in_photos": photos,
-                "move_out_photos": [],
-                "any_damage_found": False,
-                "covered_by_report": room_key in rooms_with_report_findings,
-            })
     return rooms
 
 

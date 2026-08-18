@@ -60,15 +60,17 @@
     {% if matterport_rooms %}
     <div class="matterport-review">
       <h2 class="section-heading">Matterport walkthrough review</h2>
-      <p class="note">AI-screened for possible damage from the move-out 3D walkthrough. Verify visually before relying on this — it's a second pass to catch anything the written assessment might have missed, not a replacement for it.</p>
+      <p class="note">AI-screened for possible damage, comparing move-in and move-out 3D walkthrough photos so pre-existing conditions aren't flagged as new. Verify visually before relying on this — it's a second pass to catch anything the written assessment might have missed, not a replacement for it.</p>
       {% for room in matterport_rooms %}
       <div class="matterport-room">
         <div class="matterport-room-head">
           <span class="matterport-room-label">{{ room.label }}</span>
-          {% if room.any_damage_found and not room.covered_by_report %}
-            <span class="badge badge-review">Possible damage — not in written report</span>
-          {% elif room.any_damage_found and room.covered_by_report %}
-            <span class="badge badge-wear">Possible damage — already in written report</span>
+          {% if room.any_new_damage and not room.covered_by_report %}
+            <span class="badge badge-review">Possible new damage — not in written report</span>
+          {% elif room.any_new_damage and room.covered_by_report %}
+            <span class="badge badge-wear">Possible new damage — already in written report</span>
+          {% elif room.pre_existing_damage_only %}
+            <span class="badge badge-wear">Damage visible, but present at move-in — not chargeable</span>
           {% elif not room.move_out_photos %}
             <span class="badge badge-review">No move-out photo for this room</span>
           {% else %}
@@ -84,6 +86,7 @@
               {% endfor %}
               {% if not room.move_in_photos %}<span class="note">No move-in photo</span>{% endif %}
             </div>
+            {% if room.move_in_damage_notes %}<ul class="matterport-notes">{% for n in room.move_in_damage_notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
           </div>
           <div class="matterport-photo-col">
             <span class="matterport-col-label">Move-out</span>
@@ -92,8 +95,8 @@
               <a href="{{ p.image_url }}" target="_blank" rel="noopener"><img src="{{ p.image_url }}" class="thumb" alt="Move-out {{ room.label }}" loading="lazy"></a>
               {% endfor %}
             </div>
+            {% if room.new_damage_notes %}<ul class="matterport-notes">{% for n in room.new_damage_notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
             {% for p in room.move_out_photos %}
-              {% if p.notes %}<ul class="matterport-notes">{% for n in p.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
               {% if p.error %}<p class="note">Could not screen this photo: {{ p.error }}</p>{% endif %}
             {% endfor %}
           </div>
